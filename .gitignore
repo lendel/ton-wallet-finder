@@ -1,0 +1,15 @@
+# Node.js dependencies
+node_modules/
+
+# Build artifacts and temporary files
+dist/
+*.log
+*.tmp
+*.swp
+
+# IDE and editor configuration files
+.vscode/
+*.iml
+.idea/
+*.sublime*
+*.history

@@ -1,0 +1,34 @@
+{
+  "name": "ton-wallet-finder",
+  "version": "1.0.0",
+  "description": "A library to find TON wallet addresses with a specific ending.",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha --recursive --exit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lendel/ton-wallet-finder.git"
+  },
+  "keywords": [
+    "ton",
+    "wallet",
+    "address",
+    "finder",
+    "tonweb"
+  ],
+  "author": "Lendel",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lendel/ton-wallet-finder/issues"
+  },
+  "homepage": "https://github.com/lendel/ton-wallet-finder#readme",
+  "devDependencies": {
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0"
+  },
+  "dependencies": {
+    "tonweb": "^0.0.60",
+    "tonweb-mnemonic": "^1.0.1"
+  }
+}
