@@ -8,10 +8,11 @@ const path = require('path');
 // Определяем класс TonWalletFinder
 class TonWalletFinder {
     // Конструктор класса
-    constructor(targetEnding, showProgress = false, showResult = true) {
+    constructor(targetEnding, showProcess = false, showResult = true, saveResult = false) {
         this.targetEnding = targetEnding; // Желаемое окончание адреса
-        this.showProgress = showProgress; // Опция отображения процесса поиска
+        this.showProcess = showProcess; // Опция отображения процесса поиска
         this.showResult = showResult; // Опция отображения результата
+        this.saveResult = saveResult; // Опция сохранения результата
     }
 
     // Метод для создания ключевой пары на основе мнемонической фразы
@@ -49,7 +50,7 @@ class TonWalletFinder {
             address = await this.createWallet(keyPair);
 
             // Отображение прогресса, если опция showProgress включена
-            if (this.showProgress) {
+            if (this.showProcess) {
                 console.log("Trying address:", address.toString(true, true, true));
             }
 
@@ -63,12 +64,18 @@ class TonWalletFinder {
             console.log('Private Key:', TonWeb.utils.bytesToHex(keyPair.secretKey));
             console.log('Words:', words);
             console.log('Wallet:', address.toString(true, true, true));
+        } else {
+            console.log('The search is over.');
         }
 
         // Конвертируем ключи и адрес в строки перед возвратом
         const publicKey = TonWeb.utils.bytesToHex(keyPair.publicKey);
         const privateKey = TonWeb.utils.bytesToHex(keyPair.secretKey);
         const walletAddress = address.toString(true, true, true);
+
+        if (this.saveResult) {
+            saveResultsToFile(publicKey, privateKey, words, walletAddress);
+        }
 
         // Возврат найденного кошелька с ключами и мнемонической фразой
         return { publicKey, privateKey, words, walletAddress };
@@ -90,7 +97,7 @@ function saveResultsToFile(publicKey, privateKey, words, walletAddress, fileName
         }
     });
 }
-
+  
 
 // Экспорт класса TonWalletFinder для использования в других модулях
 module.exports = {

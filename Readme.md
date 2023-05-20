@@ -13,22 +13,20 @@ npm install ton-wallet-finder
 Create a new JavaScript file, for example `findWallet.js`, and add the following code:
 
 ```javascript
-const { TonWalletFinder } = require('ton-wallet-finder');
+const { TonWalletFinder, saveResultsToFile } = require('ton-wallet-finder');
 
 // Set the target address ending and options for displaying progress and results
 const targetEnding = '8'; // Replace with the desired address ending
-const showProgress = true; // Display the search progress
+const showProcess = true; // Display the search progress
 const showResult = true; // Display the results in the console
+const saveResult = true;
 
 // Create a new instance of the TonWalletFinder class
-const finder = new TonWalletFinder(targetEnding, showProgress, showResult);
+const finder = new TonWalletFinder(targetEnding, showProcess, showResult, saveResult);
 
 // Find a wallet with the specified address ending
-finder.findWalletWithEnding().then(({ keyPair, words, address }) => {
-  console.log('Public Key:', keyPair.public);
-  console.log('Private Key:', keyPair.secret);
-  console.log('Words:', words);
-  console.log('Wallet:', address.toString(true, true, true));
+finder.findWalletWithEnding().then(({ publicKey, privateKey, words, walletAddress }) => {
+  
 }).catch(error => {
   console.error('Error:', error);
 });
@@ -79,24 +77,22 @@ npm install ton-wallet-finder
 Создайте новый JavaScript файл, например, `findWallet.js`, и добавьте следующий код:
 
 ```javascript
-const { TonWalletFinder } = require('ton-wallet-finder');
+const { TonWalletFinder, saveResultsToFile } = require('ton-wallet-finder');
 
-// Задаем окончание адреса и опции отображения прогресса и результатов
-const targetEnding = '8'; // Замените на нужное окончание адреса
-const showProgress = true; // Отображать ли процесс поиска
-const showResult = true; // Отображать ли результаты в консоли
+// Set the target address ending and options for displaying progress and results
+const targetEnding = '8'; // Replace with the desired address ending
+const showProcess = true; // Display the search progress
+const showResult = true; // Display the results in the console
+const saveResult = true;
 
-// Создаем экземпляр класса TonWalletFinder
-const finder = new TonWalletFinder(targetEnding, showProgress, showResult);
+// Create a new instance of the TonWalletFinder class
+const finder = new TonWalletFinder(targetEnding, showProcess, showResult, saveResult);
 
-// Ищем кошелек с заданным окончанием адреса
-finder.findWalletWithEnding().then(({ keyPair, words, address }) => {
-  console.log('Публичный ключ:', keyPair.public);
-  console.log('Приватный ключ:', keyPair.secret);
-  console.log('Слова:', words);
-  console.log('Кошелек:', address.toString(true, true, true));
+// Find a wallet with the specified address ending
+finder.findWalletWithEnding().then(({ publicKey, privateKey, words, walletAddress }) => {
+  
 }).catch(error => {
-  console.error('Ошибка:', error);
+  console.error('Error:', error);
 });
 ```
 
