@@ -7,8 +7,17 @@ const path = require('path');
 
 // Определяем класс TonWalletFinder
 class TonWalletFinder {
+    
     // Конструктор класса
     constructor(targetEnding, showProcess = false, showResult = true, saveResult = false) {
+
+        // Проверка наличия только допустимых символов в targetEnding
+        const validEndingRegex = /^[a-zA-Z0-9-_]+$/;
+        if (!validEndingRegex.test(targetEnding)) {
+            throw new Error('Invalid target ending. Only Latin letters, numbers, dashes, and underscores are allowed.');
+        }
+
+
         this.targetEnding = targetEnding; // Желаемое окончание адреса
         this.showProcess = showProcess; // Опция отображения процесса поиска
         this.showResult = showResult; // Опция отображения результата
