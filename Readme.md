@@ -1,5 +1,12 @@
 # TON Wallet Finder
 
+![npm](https://img.shields.io/npm/v/ton-wallet-finder?color=crimson&style=flat-square)
+![downloads](https://img.shields.io/npm/dy/ton-wallet-finder?color=blue&style=flat-square)
+![license](https://img.shields.io/npm/l/ton-wallet-finder?color=green&style=flat-square)
+![issues](https://img.shields.io/github/issues/andrey-karpov/ton-wallet-finder?style=flat-square)
+
+---
+
 This library allows you to find TON wallets with specific address endings. It generates wallets until it finds one whose address ends with the desired string.
 
 ## Installation
@@ -65,10 +72,18 @@ This method returns a Promise that resolves with an object containing the follow
 - **`words`**: An array of 24 words representing the wallet's mnemonic seed phrase.
 - **`walletAddress`**: A string representing the wallet address in the TON format (e.g., `EQ...`).
 
-## Donations
+## 💖 Support the Author
 
-If you would like to show your gratitude and support, you can donate cryptocurrency to the TonCoin (TON) wallet address:  
-`EQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJXtr`.
+If this library saved you time or helped your project — consider sending a small thank-you 🙏
+
+### 💎 TonCoin (TON)
+`EQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJXtr`
+
+![TON QR](https://ton.org/img/qr.svg)
+
+### ☕ Other ways
+- [PayPal](https://paypal.me/lendelkz)
+
 
 ## License
 
