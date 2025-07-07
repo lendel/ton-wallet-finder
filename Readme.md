@@ -79,7 +79,7 @@ If this library saved you time or helped your project — consider sending a sma
 ### 💎 TonCoin (TON)
 `EQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJXtr`
 
-[Donate](ton://UQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJSau?comment=Thank%20you%20for%20supporting%20ton-wallet-finder%20%F0%9F%92%99)
+[Donation](https://tonkeeper.com/transfer/EQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJXtr?text=Thank%20you%20for%20supporting%20ton-wallet-finder%20%F0%9F%92%99)
 
 
 
