@@ -79,7 +79,7 @@ If this library saved you time or helped your project — consider sending a sma
 ### 💎 TonCoin (TON)
 `EQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJXtr`
 
-![TON QR](https://ton.org/img/qr.svg)
+
 
 ### ☕ Other ways
 - [PayPal](https://paypal.me/lendelkz)
