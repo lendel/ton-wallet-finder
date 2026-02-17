@@ -1,6 +1,5 @@
 # Node.js dependencies
 node_modules/
-test/
 
 # Build artifacts and temporary files
 dist/
@@ -16,3 +15,6 @@ dist/
 *.history
 
 .npmrc
+
+# Internal analysis files
+ANALYSIS.md
