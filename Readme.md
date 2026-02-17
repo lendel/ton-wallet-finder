@@ -1,181 +1,213 @@
 # TON Wallet Finder
 
-![npm](https://img.shields.io/npm/v/ton-wallet-finder?color=crimson&style=flat-square)
-![downloads](https://img.shields.io/npm/dy/ton-wallet-finder?color=blue&style=flat-square)
+<div align="center">
+
+![npm version](https://img.shields.io/npm/v/ton-wallet-finder?color=crimson&style=flat-square)
+![npm downloads](https://img.shields.io/npm/dy/ton-wallet-finder?color=blue&style=flat-square)
 ![license](https://img.shields.io/npm/l/ton-wallet-finder?color=green&style=flat-square)
-![issues](https://img.shields.io/github/issues/andrey-karpov/ton-wallet-finder?style=flat-square)
+![CI](https://img.shields.io/github/actions/workflow/status/lendel/ton-wallet-finder/ci.yml?label=CI&style=flat-square)
+![TypeScript](https://img.shields.io/badge/TypeScript-supported-blue?style=flat-square&logo=typescript)
+![issues](https://img.shields.io/github/issues/lendel/ton-wallet-finder?style=flat-square)
+
+**Vanity address generator for TON blockchain.**
+Find a wallet whose address ends with any string you choose.
+
+[English](#-installation) · [Русский](#-установка)
+
+</div>
 
 ---
 
-This library allows you to find TON wallets with specific address endings. It generates wallets until it finds one whose address ends with the desired string.
+## Table of Contents
 
-## Installation
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Options](#-options)
+- [API](#-api)
+- [Performance](#-performance)
+- [Support the Author](#-support-the-author)
+- [License](#-license)
 
-To install the library, use the following command:
+---
+
+## 📦 Installation
 
 ```sh
 npm install ton-wallet-finder
 ```
 
-## Usage
+> Requires Node.js 18 or higher.
 
-Create a new JavaScript file, for example, `findWallet.js`, and add the following code:
+---
+
+## Quick Start
 
 ```javascript
 const { TonWalletFinder, saveResultsToFile } = require('ton-wallet-finder');
 
-// Set the target address ending and options for displaying progress, results, and saving to a file
-const targetEnding = '8'; // Replace with the desired address ending (e.g., 'abc')
-const showProcess = true;  // Set to true to display the search progress in the console
-const showResult = true;   // Set to true to display the results in the console
-const saveResult = true;   // Set to true to save the results to a file
+const finder = new TonWalletFinder(
+  'abc',  // target ending
+  true,   // showProcess — log each attempt
+  true,   // showResult  — log found wallet
+  true    // saveResult  — save to ton_wallet_results.txt
+);
 
-// Create a new instance of the TonWalletFinder class
-const finder = new TonWalletFinder(targetEnding, showProcess, showResult, saveResult);
-
-// Find a wallet with the specified address ending
-finder.findWalletWithEnding().then(({ publicKey, privateKey, words, walletAddress }) => {
-  // Optionally, handle the result here if needed
-}).catch(error => {
-  console.error('Error:', error);
-});
+finder.findWalletWithEnding()
+  .then(({ publicKey, privateKey, words, walletAddress }) => {
+    console.log('Found:', walletAddress);
+  })
+  .catch(console.error);
 ```
 
-Run your script using Node.js:
+Run:
 
 ```sh
 node findWallet.js
 ```
 
-### How It Works
-- The library generates TON wallets and checks their addresses until it finds one that ends with the specified `targetEnding`.
-- If `showProcess` is `true`, it logs each attempted address to the console.
-- If `showResult` is `true`, it logs the found wallet's details (public key, private key, mnemonic words, and address) to the console.
-- If `saveResult` is `true`, it saves the wallet details to a file named `ton_wallet_results.txt` in the script's directory.
+---
 
 ## Options
 
-The `TonWalletFinder` constructor accepts the following parameters:
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `targetEnding` | `string` | required | Desired address ending. Latin letters, digits, `-`, `_` |
+| `showProcess` | `boolean` | `false` | Log each attempted address to console |
+| `showResult` | `boolean` | `true` | Log found wallet details to console |
+| `saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` |
 
-- **`targetEnding`** (required): The desired ending for the wallet address. Must consist of Latin letters, numbers, dashes, and underscores.
-- **`showProcess`** (optional, default: `false`): If `true`, displays the search progress in the console.
-- **`showResult`** (optional, default: `true`): If `true`, displays the search results in the console.
-- **`saveResult`** (optional, default: `false`): If `true`, saves the search results to a file.
+---
 
-## Methods
+## API
 
-### `findWalletWithEnding()`
-This method returns a Promise that resolves with an object containing the following properties:
+### `findWalletWithEnding() → Promise<Result>`
 
-- **`publicKey`**: A string representing the public key in hexadecimal format.
-- **`privateKey`**: A string representing the private key in hexadecimal format.
-- **`words`**: An array of 24 words representing the wallet's mnemonic seed phrase.
-- **`walletAddress`**: A string representing the wallet address in the TON format (e.g., `EQ...`).
+Generates wallets until one matches the target ending. Returns:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `publicKey` | `string` | Public key (hex) |
+| `privateKey` | `string` | Private key (hex) |
+| `words` | `string[]` | 24-word mnemonic seed phrase |
+| `walletAddress` | `string` | TON address (e.g. `EQa...abc`) |
+
+TypeScript declarations are included (`index.d.ts`).
+
+---
+
+## Performance
+
+Search time grows exponentially with ending length. Rough estimates on a modern CPU:
+
+| Ending length | ~Attempts | ~Time |
+|--------------|-----------|-------|
+| 1 char | ~32 | instant |
+| 2 chars | ~1 000 | seconds |
+| 3 chars | ~32 000 | minutes |
+| 4 chars | ~1 000 000 | hours |
+
+> The TON address alphabet is base64url, so each character has 64 possible values.
+
+---
 
 ## 💖 Support the Author
 
-If this library saved you time or helped your project — consider sending a small thank-you 🙏
+If this library saved you time — a small thank-you goes a long way!
 
-### 💎 TonCoin (TON)
-`EQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJXtr`
+<div align="center">
 
+### 💎 TON
 
-[![Donate with Tonkeeper](https://img.shields.io/badge/Donate-Tonkeeper-4A90E2?logo=tonkeeper&logoColor=white)](https://app.tonkeeper.com/transfer/UQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJSau?text=Thank%20you%20for%20supporting%20ton-wallet-finder%20%F0%9F%92%99)
+`UQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJSau`
 
-[![Donate with Tonhub](https://img.shields.io/badge/Donate-Tonhub-2F80ED?logo=tonhub&logoColor=white)](https://tonhub.com/transfer/UQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJSau?text=Thank%20you%20for%20supporting%20ton-wallet-finder%20%F0%9F%92%99)
+[![Donate via Tonkeeper](https://img.shields.io/badge/Donate-Tonkeeper-0088CC?style=for-the-badge&logo=telegram&logoColor=white)](https://app.tonkeeper.com/transfer/UQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJSau?text=Thank%20you%20for%20ton-wallet-finder!)
+[![Donate via Tonhub](https://img.shields.io/badge/Donate-Tonhub-2F80ED?style=for-the-badge&logo=telegram&logoColor=white)](https://tonhub.com/transfer/UQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJSau?text=Thank%20you%20for%20ton-wallet-finder!)
 
 ---
 
-**TON address:**  
-`UQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJSau`
+### 💳 Other ways
+
+[![PayPal](https://img.shields.io/badge/PayPal-lendelkz-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.me/lendelkz)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-lendelkz-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/lendelkz)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-lendelkz-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/lendelkz)
+
+</div>
 
 Thank you for your support! 💙
 
-
-
-
-### ☕ Other ways
-- [PayPal](https://paypal.me/lendelkz)
-
-
-## License
-
-This library is licensed under the MIT License.
-
 ---
 
-# TON Wallet Finder
+## Русский
 
-Эта библиотека позволяет находить кошельки TON с определенными окончаниями адресов. Она генерирует кошельки, пока не найдет тот, чей адрес заканчивается на указанную строку.
+<details>
+<summary>Документация на русском языке</summary>
 
-## Установка
-
-Для установки библиотеки используйте команду:
+### Установка
 
 ```sh
 npm install ton-wallet-finder
 ```
 
-## Использование
+> Требуется Node.js 18 или выше.
 
-Создайте новый JavaScript файл, например, `findWallet.js`, и добавьте следующий код:
+### Быстрый старт
 
 ```javascript
 const { TonWalletFinder, saveResultsToFile } = require('ton-wallet-finder');
 
-// Установите желаемое окончание адреса и опции для отображения прогресса, результатов и сохранения в файл
-const targetEnding = '8'; // Замените на желаемое окончание адреса (например, 'abc')
-const showProcess = true;  // Установите true, чтобы отображать прогресс поиска в консоли
-const showResult = true;   // Установите true, чтобы отображать результаты в консоли
-const saveResult = true;   // Установите true, чтобы сохранить результаты в файл
+const finder = new TonWalletFinder(
+  'abc',  // желаемое окончание адреса
+  true,   // showProcess — выводить каждую попытку
+  true,   // showResult  — вывести найденный кошелёк
+  true    // saveResult  — сохранить в ton_wallet_results.txt
+);
 
-// Создание нового экземпляра класса TonWalletFinder
-const finder = new TonWalletFinder(targetEnding, showProcess, showResult, saveResult);
-
-// Поиск кошелька с указанным окончанием адреса
-finder.findWalletWithEnding().then(({ publicKey, privateKey, words, walletAddress }) => {
-  // Опционально, обработайте результат здесь, если нужно
-}).catch(error => {
-  console.error('Ошибка:', error);
-});
+finder.findWalletWithEnding()
+  .then(({ publicKey, privateKey, words, walletAddress }) => {
+    console.log('Найдено:', walletAddress);
+  })
+  .catch(console.error);
 ```
 
-Запустите ваш скрипт с помощью Node.js:
+### Опции
 
-```sh
-node findWallet.js
-```
+| Параметр | Тип | По умолчанию | Описание |
+|----------|-----|--------------|----------|
+| `targetEnding` | `string` | обязательный | Желаемое окончание адреса. Латиница, цифры, `-`, `_` |
+| `showProcess` | `boolean` | `false` | Выводить каждый проверяемый адрес в консоль |
+| `showResult` | `boolean` | `true` | Вывести найденный кошелёк в консоль |
+| `saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` |
 
-### Как это работает
-- Библиотека генерирует кошельки TON и проверяет их адреса, пока не найдет тот, который заканчивается на указанное `targetEnding`.
-- Если `showProcess` установлено в `true`, в консоль выводится каждый проверенный адрес.
-- Если `showResult` установлено в `true`, в консоль выводятся детали найденного кошелька (публичный ключ, приватный ключ, мнемонические слова и адрес).
-- Если `saveResult` установлено в `true`, детали кошелька сохраняются в файл `ton_wallet_results.txt` в директории скрипта.
+### API
 
-## Опции
+#### `findWalletWithEnding() → Promise<Result>`
 
-Конструктор `TonWalletFinder` принимает следующие параметры:
+Генерирует кошельки, пока не найдёт совпадение. Возвращает:
 
-- **`targetEnding`** (обязательный): Желаемое окончание адреса кошелька. Должно состоять из латинских букв, цифр, дефисов и подчеркиваний.
-- **`showProcess`** (необязательный, по умолчанию: `false`): Если `true`, отображает прогресс поиска в консоли.
-- **`showResult`** (необязательный, по умолчанию: `true`): Если `true`, отображает результаты поиска в консоли.
-- **`saveResult`** (необязательный, по умолчанию: `false`): Если `true`, сохраняет результаты поиска в файл.
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `publicKey` | `string` | Публичный ключ (hex) |
+| `privateKey` | `string` | Приватный ключ (hex) |
+| `words` | `string[]` | 24-словная мнемоническая фраза |
+| `walletAddress` | `string` | Адрес TON (например, `EQa...abc`) |
 
-## Методы
+Поставляется с декларациями TypeScript (`index.d.ts`).
 
-### `findWalletWithEnding()`
-Этот метод возвращает Promise, который разрешается объектом, содержащим следующие свойства:
+### Производительность
 
-- **`publicKey`**: Строка, представляющая публичный ключ в шестнадцатеричном формате.
-- **`privateKey`**: Строка, представляющая приватный ключ в шестнадцатеричном формате.
-- **`words`**: Массив из 24 слов, представляющих мнемоническую фразу кошелька.
-- **`walletAddress`**: Строка, представляющая адрес кошелька в формате TON (например, `EQ...`).
+Время поиска растёт экспоненциально с длиной окончания:
 
-## Пожертвования
+| Длина окончания | ~Попыток | ~Время |
+|----------------|----------|--------|
+| 1 символ | ~32 | мгновенно |
+| 2 символа | ~1 000 | секунды |
+| 3 символа | ~32 000 | минуты |
+| 4 символа | ~1 000 000 | часы |
 
-Если вы хотите проявить свою благодарность и поддержку, вы можете пожертвовать криптовалюту на адрес кошелька TonCoin (TON):  
-`EQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJXtr`.
+</details>
 
-## Лицензия
+---
 
-Эта библиотека распространяется под лицензией MIT.
+## License
+
+MIT © [Lendel](https://github.com/lendel)

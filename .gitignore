@@ -15,3 +15,6 @@ dist/
 *.history
 
 .npmrc
+
+# Internal analysis files
+ANALYSIS.md
