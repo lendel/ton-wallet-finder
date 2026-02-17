@@ -47,10 +47,15 @@ class TonWalletFinder {
 
         // Цикл поиска кошелька
         do {
-            // Создание ключевой пары и получение мнемонической фразы
-            ({ keyPair, words } = await this.createKeyPair());
-            // Создание кошелька с полученной ключевой парой
-            address = await this.createWallet(keyPair);
+            try {
+                // Создание ключевой пары и получение мнемонической фразы
+                ({ keyPair, words } = await this.createKeyPair());
+                // Создание кошелька с полученной ключевой парой
+                address = await this.createWallet(keyPair);
+            } catch (err) {
+                console.error('Error generating wallet, retrying:', err.message);
+                continue;
+            }
 
             // Форматируем адрес в строку с нужными параметрами
             const addressString = address.toString({ urlSafe: true, bounceable: true });
@@ -81,7 +86,7 @@ class TonWalletFinder {
 
         // Сохранение результатов, если опция saveResult включена
         if (this.saveResult) {
-            saveResultsToFile(publicKey, privateKey, words.join(' '), walletAddress);
+            saveResultsToFile(publicKey, privateKey, words, walletAddress);
         }
 
         // Возврат найденного кошелька с ключами и мнемонической фразой
@@ -90,10 +95,15 @@ class TonWalletFinder {
 }
 
 function saveResultsToFile(publicKey, privateKey, words, walletAddress, fileName = 'ton_wallet_results.txt') {
-    const scriptDirectory = path.dirname(require.main.filename); // Получаем папку, где находится пользовательский скрипт
+    // BUG-02 fix: require.main может быть null в ESM-окружениях и тестовых фреймворках
+    const scriptDirectory = require.main
+        ? path.dirname(require.main.filename)
+        : process.cwd();
     const resultsFile = path.join(scriptDirectory, fileName); // Создаем путь к файлу с результатами
 
-    const data = `Public Key: ${publicKey}\nPrivate Key: ${privateKey}\nWords: ${words.join(' ')}\nWallet: ${walletAddress}\n`;
+    // BUG-01 fix: words — массив, поэтому вызываем .join() здесь корректно
+    const wordsString = Array.isArray(words) ? words.join(' ') : words;
+    const data = `Public Key: ${publicKey}\nPrivate Key: ${privateKey}\nWords: ${wordsString}\nWallet: ${walletAddress}\n`;
 
     // Записываем данные в файл
     fs.writeFile(resultsFile, data, (err) => {
