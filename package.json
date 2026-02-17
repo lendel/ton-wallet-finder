@@ -1,6 +1,6 @@
 {
   "name": "ton-wallet-finder",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A library to find TON wallet addresses with a specific ending.",
   "main": "index.js",
   "scripts": {
@@ -15,8 +15,12 @@
     "wallet",
     "address",
     "finder",
-    "tonweb"
+    "vanity",
+    "mnemonic",
+    "ton-blockchain",
+    "ton-wallet"
   ],
+  "types": "index.d.ts",
   "author": "Lendel",
   "license": "MIT",
   "bugs": {
