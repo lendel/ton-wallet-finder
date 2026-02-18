@@ -12,7 +12,7 @@ describe('TonWalletFinder', () => {
     // Constructor validation
     // -------------------------------------------------------------------------
     describe('constructor', () => {
-        it('should create an instance with valid targetEnding', () => {
+        it('should create an instance with valid targetEnding (no options)', () => {
             const finder = new TonWalletFinder('abc');
             expect(finder).to.be.instanceOf(TonWalletFinder);
             expect(finder.targetEnding).to.equal('abc');
@@ -52,6 +52,59 @@ describe('TonWalletFinder', () => {
             const finder = new TonWalletFinder('x');
             expect(finder.saveResult).to.equal(false);
         });
+
+        it('should default walletVersion to "v4"', () => {
+            const finder = new TonWalletFinder('x');
+            expect(finder.walletVersion).to.equal('v4');
+        });
+
+        it('should default workers to 1', () => {
+            const finder = new TonWalletFinder('x');
+            expect(finder.workers).to.equal(1);
+        });
+
+        it('should default fileName to "ton_wallet_results.txt"', () => {
+            const finder = new TonWalletFinder('x');
+            expect(finder.fileName).to.equal('ton_wallet_results.txt');
+        });
+
+        it('should accept walletVersion "v5r1"', () => {
+            expect(() => new TonWalletFinder('x', { walletVersion: 'v5r1' })).not.to.throw();
+            const finder = new TonWalletFinder('x', { walletVersion: 'v5r1' });
+            expect(finder.walletVersion).to.equal('v5r1');
+        });
+
+        it('should throw on invalid walletVersion', () => {
+            expect(() => new TonWalletFinder('x', { walletVersion: 'v3' }))
+                .to.throw(Error, /Invalid walletVersion/);
+        });
+
+        it('should accept workers: "auto"', () => {
+            const finder = new TonWalletFinder('x', { workers: 'auto' });
+            expect(finder.workers).to.equal('auto');
+        });
+
+        it('should store custom fileName', () => {
+            const finder = new TonWalletFinder('x', { fileName: 'custom.txt' });
+            expect(finder.fileName).to.equal('custom.txt');
+        });
+
+        it('should respect all options when provided', () => {
+            const finder = new TonWalletFinder('abc', {
+                showProcess: true,
+                showResult: false,
+                saveResult: true,
+                walletVersion: 'v5r1',
+                workers: 4,
+                fileName: 'out.txt'
+            });
+            expect(finder.showProcess).to.equal(true);
+            expect(finder.showResult).to.equal(false);
+            expect(finder.saveResult).to.equal(true);
+            expect(finder.walletVersion).to.equal('v5r1');
+            expect(finder.workers).to.equal(4);
+            expect(finder.fileName).to.equal('out.txt');
+        });
     });
 
     // -------------------------------------------------------------------------
@@ -85,10 +138,10 @@ describe('TonWalletFinder', () => {
     });
 
     // -------------------------------------------------------------------------
-    // createWallet
+    // createWallet — V4 and V5R1
     // -------------------------------------------------------------------------
     describe('createWallet()', () => {
-        it('should return an address object', async () => {
+        it('should return an address object (v4)', async () => {
             const finder = new TonWalletFinder('a');
             const { keyPair } = await finder.createKeyPair();
             const address = await finder.createWallet(keyPair);
@@ -96,7 +149,7 @@ describe('TonWalletFinder', () => {
             expect(typeof address.toString).to.equal('function');
         });
 
-        it('should produce a bounceable URL-safe address starting with EQ or UQ', async () => {
+        it('should produce a bounceable URL-safe address starting with EQ or UQ (v4)', async () => {
             const finder = new TonWalletFinder('a');
             const { keyPair } = await finder.createKeyPair();
             const address = await finder.createWallet(keyPair);
@@ -104,17 +157,36 @@ describe('TonWalletFinder', () => {
             expect(str).to.match(/^(EQ|UQ)/);
             expect(str).to.have.lengthOf(48);
         });
+
+        it('should produce a valid address for walletVersion v5r1', async () => {
+            const finder = new TonWalletFinder('a', { walletVersion: 'v5r1' });
+            const { keyPair } = await finder.createKeyPair();
+            const address = await finder.createWallet(keyPair);
+            const str = address.toString({ urlSafe: true, bounceable: true });
+            expect(str).to.match(/^(EQ|UQ)/);
+            expect(str).to.have.lengthOf(48);
+        });
+
+        it('should produce different addresses for v4 vs v5r1 with same key', async () => {
+            const finderV4 = new TonWalletFinder('a', { walletVersion: 'v4' });
+            const finderV5 = new TonWalletFinder('a', { walletVersion: 'v5r1' });
+            const { keyPair } = await finderV4.createKeyPair();
+            const addrV4 = await finderV4.createWallet(keyPair);
+            const addrV5 = await finderV5.createWallet(keyPair);
+            const strV4 = addrV4.toString({ urlSafe: true, bounceable: true });
+            const strV5 = addrV5.toString({ urlSafe: true, bounceable: true });
+            expect(strV4).to.not.equal(strV5);
+        });
     });
 
     // -------------------------------------------------------------------------
-    // findWalletWithEnding — functional test with short 1-char ending
+    // findWalletWithEnding
     // -------------------------------------------------------------------------
     describe('findWalletWithEnding()', () => {
         it('should find a wallet whose address ends with the given single character', async function () {
-            // Single character: ~1/62 chance per attempt → fast in practice
             this.timeout(60000);
             const target = 'A';
-            const finder = new TonWalletFinder(target, false, false, false);
+            const finder = new TonWalletFinder(target, { showResult: false });
             const result = await finder.findWalletWithEnding();
             expect(result).to.have.all.keys('publicKey', 'privateKey', 'words', 'walletAddress');
             expect(result.walletAddress).to.be.a('string');
@@ -128,12 +200,11 @@ describe('TonWalletFinder', () => {
         it('should call saveResultsToFile without TypeError when saveResult is true (BUG-01 regression)', async function () {
             this.timeout(60000);
             const writeFileStub = sinon.stub(fs, 'writeFile').yields(null);
+            const consoleWarnStub = sinon.stub(console, 'warn');
             try {
-                const finder = new TonWalletFinder('A', false, false, true);
-                // Must not throw "words.join is not a function"
+                const finder = new TonWalletFinder('A', { showResult: false, saveResult: true });
                 await finder.findWalletWithEnding();
                 expect(writeFileStub.calledOnce).to.equal(true);
-                // Verify the file content includes 'Words:'
                 const writtenData = writeFileStub.firstCall.args[1];
                 expect(writtenData).to.include('Words:');
                 expect(writtenData).to.include('Public Key:');
@@ -141,7 +212,61 @@ describe('TonWalletFinder', () => {
                 expect(writtenData).to.include('Wallet:');
             } finally {
                 writeFileStub.restore();
+                consoleWarnStub.restore();
             }
+        });
+
+        it('should print security warning to stderr when saveResult is true', async function () {
+            this.timeout(60000);
+            const writeFileStub = sinon.stub(fs, 'writeFile').yields(null);
+            const consoleWarnStub = sinon.stub(console, 'warn');
+            try {
+                const finder = new TonWalletFinder('A', { showResult: false, saveResult: true });
+                await finder.findWalletWithEnding();
+                expect(consoleWarnStub.calledOnce).to.equal(true);
+                expect(consoleWarnStub.firstCall.args[0]).to.include('WARNING');
+            } finally {
+                writeFileStub.restore();
+                consoleWarnStub.restore();
+            }
+        });
+
+        it('should log "Trying address:" to console when showProcess is true', async function () {
+            this.timeout(60000);
+            const consoleLogStub = sinon.stub(console, 'log');
+            try {
+                const finder = new TonWalletFinder('A', { showProcess: true, showResult: false });
+                await finder.findWalletWithEnding();
+                const tryingCalls = consoleLogStub.args.filter(
+                    args => typeof args[0] === 'string' && args[0].includes('Trying address:')
+                );
+                expect(tryingCalls.length).to.be.greaterThan(0);
+            } finally {
+                consoleLogStub.restore();
+            }
+        });
+
+        it('should log "The search is over." when showResult is false', async function () {
+            this.timeout(60000);
+            const consoleLogStub = sinon.stub(console, 'log');
+            try {
+                const finder = new TonWalletFinder('A', { showResult: false });
+                await finder.findWalletWithEnding();
+                const doneCalls = consoleLogStub.args.filter(
+                    args => args[0] === 'The search is over.'
+                );
+                expect(doneCalls.length).to.equal(1);
+            } finally {
+                consoleLogStub.restore();
+            }
+        });
+
+        it('should find a V5R1 wallet ending with a given character', async function () {
+            this.timeout(60000);
+            const target = 'B';
+            const finder = new TonWalletFinder(target, { walletVersion: 'v5r1', showResult: false });
+            const result = await finder.findWalletWithEnding();
+            expect(result.walletAddress.endsWith(target)).to.equal(true);
         });
     });
 
@@ -172,7 +297,6 @@ describe('TonWalletFinder', () => {
         });
 
         it('should call fs.writeFile correctly when words is already a string (BUG-01 robustness)', () => {
-            // Guard against pre-joined strings being passed by external callers
             saveResultsToFile('pubkey', 'privkey', 'word1 word2 word3', 'EQAbc123');
             expect(writeFileStub.calledOnce).to.equal(true);
             const [, data] = writeFileStub.firstCall.args;

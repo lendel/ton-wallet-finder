@@ -25,6 +25,7 @@ Find a wallet whose address ends with any string you choose.
 - [Options](#-options)
 - [API](#-api)
 - [Performance](#-performance)
+- [Security](#-security)
 - [Support the Author](#-support-the-author)
 - [License](#-license)
 
@@ -43,20 +44,23 @@ npm install ton-wallet-finder
 ## Quick Start
 
 ```javascript
-const { TonWalletFinder, saveResultsToFile } = require('ton-wallet-finder');
+const { TonWalletFinder } = require('ton-wallet-finder');
 
-const finder = new TonWalletFinder(
-  'abc',  // target ending
-  true,   // showProcess — log each attempt
-  true,   // showResult  — log found wallet
-  true    // saveResult  — save to ton_wallet_results.txt
-);
+// Basic — WalletV4, single-threaded
+const finder = new TonWalletFinder('abc');
+const result = await finder.findWalletWithEnding();
+console.log('Found:', result.walletAddress); // e.g. EQ...abc
 
-finder.findWalletWithEnding()
-  .then(({ publicKey, privateKey, words, walletAddress }) => {
-    console.log('Found:', walletAddress);
-  })
-  .catch(console.error);
+// With options
+const finder2 = new TonWalletFinder('xyz', {
+  walletVersion: 'v5r1',  // WalletContractV5R1
+  workers: 'auto',         // use all CPU cores
+  showProcess: true,       // log each attempt (single-thread only)
+  showResult: true,        // log found wallet to console
+  saveResult: true,        // save credentials to file
+  fileName: 'my_wallet.txt'
+});
+const result2 = await finder2.findWalletWithEnding();
 ```
 
 Run:
@@ -69,12 +73,19 @@ node findWallet.js
 
 ## Options
 
+```js
+new TonWalletFinder(targetEnding, options?)
+```
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `targetEnding` | `string` | required | Desired address ending. Latin letters, digits, `-`, `_` |
-| `showProcess` | `boolean` | `false` | Log each attempted address to console |
-| `showResult` | `boolean` | `true` | Log found wallet details to console |
-| `saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` |
+| `targetEnding` | `string` | **required** | Desired address ending. Latin letters, digits, `-`, `_` |
+| `options.showProcess` | `boolean` | `false` | Log each attempted address (single-thread only) |
+| `options.showResult` | `boolean` | `true` | Log found wallet credentials to console |
+| `options.saveResult` | `boolean` | `false` | Save credentials to a plain-text file |
+| `options.walletVersion` | `'v4'` \| `'v5r1'` | `'v4'` | Wallet contract version |
+| `options.workers` | `number` \| `'auto'` | `1` | Worker Threads count (`'auto'` = all CPU cores) |
+| `options.fileName` | `string` | `'ton_wallet_results.txt'` | Output filename (when `saveResult: true`) |
 
 ---
 
@@ -97,16 +108,29 @@ TypeScript declarations are included (`index.d.ts`).
 
 ## Performance
 
-Search time grows exponentially with ending length. Rough estimates on a modern CPU:
+Search time grows exponentially with ending length. Rough estimates on a single core (~1 000 wallets/s):
 
-| Ending length | ~Attempts | ~Time |
-|--------------|-----------|-------|
-| 1 char | ~32 | instant |
-| 2 chars | ~1 000 | seconds |
-| 3 chars | ~32 000 | minutes |
-| 4 chars | ~1 000 000 | hours |
+| Ending length | ~Attempts | ~Time (1 thread) |
+|--------------|-----------|-----------------|
+| 1 char | ~64 | instant |
+| 2 chars | ~4 000 | ~4 s |
+| 3 chars | ~262 000 | ~4 min |
+| 4 chars | ~16 700 000 | ~4.5 h |
 
-> The TON address alphabet is base64url, so each character has 64 possible values.
+> The TON address alphabet is base64url — 64 possible values per character.
+
+Use `workers: 'auto'` to search across all CPU cores and get a near-linear speedup.
+
+---
+
+## Security
+
+> **Important:** when `saveResult: true`, your **private key** and **seed phrase** are written to a plain-text file on disk.
+
+- **Never share** the output file or commit it to version control.
+- Move or encrypt the file immediately after use.
+- The library prints a warning to stderr every time it writes credentials to disk.
+- If you only need the address, set `saveResult: false` (the default) and store the result securely yourself.
 
 ---
 
@@ -153,20 +177,22 @@ npm install ton-wallet-finder
 ### Быстрый старт
 
 ```javascript
-const { TonWalletFinder, saveResultsToFile } = require('ton-wallet-finder');
+const { TonWalletFinder } = require('ton-wallet-finder');
 
-const finder = new TonWalletFinder(
-  'abc',  // желаемое окончание адреса
-  true,   // showProcess — выводить каждую попытку
-  true,   // showResult  — вывести найденный кошелёк
-  true    // saveResult  — сохранить в ton_wallet_results.txt
-);
+// Базовое использование — WalletV4, один поток
+const finder = new TonWalletFinder('abc');
+const result = await finder.findWalletWithEnding();
+console.log('Найдено:', result.walletAddress);
 
-finder.findWalletWithEnding()
-  .then(({ publicKey, privateKey, words, walletAddress }) => {
-    console.log('Найдено:', walletAddress);
-  })
-  .catch(console.error);
+// С опциями
+const finder2 = new TonWalletFinder('xyz', {
+  walletVersion: 'v5r1', // WalletContractV5R1
+  workers: 'auto',        // использовать все ядра CPU
+  showProcess: true,      // выводить каждую попытку (только в одном потоке)
+  showResult: true,
+  saveResult: true,
+  fileName: 'my_wallet.txt'
+});
 ```
 
 ### Опции
@@ -174,9 +200,12 @@ finder.findWalletWithEnding()
 | Параметр | Тип | По умолчанию | Описание |
 |----------|-----|--------------|----------|
 | `targetEnding` | `string` | обязательный | Желаемое окончание адреса. Латиница, цифры, `-`, `_` |
-| `showProcess` | `boolean` | `false` | Выводить каждый проверяемый адрес в консоль |
-| `showResult` | `boolean` | `true` | Вывести найденный кошелёк в консоль |
-| `saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` |
+| `options.showProcess` | `boolean` | `false` | Выводить каждый проверяемый адрес (только 1 поток) |
+| `options.showResult` | `boolean` | `true` | Вывести найденный кошелёк в консоль |
+| `options.saveResult` | `boolean` | `false` | Сохранить результат в файл |
+| `options.walletVersion` | `'v4'` \| `'v5r1'` | `'v4'` | Версия контракта кошелька |
+| `options.workers` | `number` \| `'auto'` | `1` | Число Worker Threads (`'auto'` = все ядра) |
+| `options.fileName` | `string` | `'ton_wallet_results.txt'` | Имя файла при `saveResult: true` |
 
 ### API
 
