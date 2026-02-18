@@ -13,14 +13,33 @@ export interface WalletResult {
 }
 
 /**
+ * Options accepted by `findWalletWithEnding`.
+ */
+export interface FindOptions {
+    /**
+     * An AbortSignal to cancel the search.
+     * When aborted, `findWalletWithEnding` rejects with an Error whose message
+     * is taken from `signal.reason` (if a string) or `'Wallet search aborted'`.
+     */
+    signal?: AbortSignal;
+}
+
+/**
  * Searches for a TON WalletV4 address that ends with the given pattern.
  *
  * @example
  * ```js
  * const { TonWalletFinder } = require('ton-wallet-finder');
- * const finder = new TonWalletFinder('abc', false, true, false);
+ * const finder = new TonWalletFinder('abc');
  * const result = await finder.findWalletWithEnding();
  * console.log(result.walletAddress); // e.g. "EQ...abc"
+ * ```
+ *
+ * @example Cancellable search
+ * ```js
+ * const controller = new AbortController();
+ * setTimeout(() => controller.abort(), 30_000); // cancel after 30 s
+ * const result = await finder.findWalletWithEnding({ signal: controller.signal });
  * ```
  */
 export declare class TonWalletFinder {
@@ -37,7 +56,7 @@ export declare class TonWalletFinder {
      * @param targetEnding - Desired suffix for the wallet address.
      *   Only Latin letters [a-zA-Z], digits [0-9], dashes [-] and underscores [_] are allowed.
      * @param showProcess - Log each attempted address. Default: `false`
-     * @param showResult  - Log the found wallet to console. Default: `true`
+     * @param showResult  - Log the found wallet to console. Default: `false`
      * @param saveResult  - Save the result to a text file. Default: `false`
      * @throws {Error} If `targetEnding` contains invalid characters.
      */
@@ -55,24 +74,30 @@ export declare class TonWalletFinder {
 
     /**
      * Creates a WalletContractV4 instance from a key pair and returns its address object.
+     * Synchronous — no I/O is performed.
      */
-    createWallet(keyPair: { publicKey: Uint8Array; secretKey: Uint8Array }): Promise<{ toString(opts: { urlSafe: boolean; bounceable: boolean }): string }>;
+    createWallet(keyPair: { publicKey: Uint8Array; secretKey: Uint8Array }): { toString(opts: { urlSafe: boolean; bounceable: boolean }): string };
 
     /**
      * Continuously generates random wallets until one whose address ends with `targetEnding` is found.
+     * Pass `options.signal` to cancel the search at any time.
+     *
+     * @param options - Optional configuration (e.g. AbortSignal).
      * @returns The found wallet's credentials.
      */
-    findWalletWithEnding(): Promise<WalletResult>;
+    findWalletWithEnding(options?: FindOptions): Promise<WalletResult>;
 }
 
 /**
- * Saves wallet credentials to a plain-text file.
+ * Saves wallet credentials to a plain-text file using `fs.promises.writeFile`.
+ * The returned Promise resolves once the file has been fully written to disk.
  *
- * @param publicKey    - Hex-encoded public key.
- * @param privateKey   - Hex-encoded private/secret key.
- * @param words        - Mnemonic seed phrase (array or pre-joined string).
+ * @param publicKey     - Hex-encoded public key.
+ * @param privateKey    - Hex-encoded private/secret key.
+ * @param words         - Mnemonic seed phrase (array or pre-joined string).
  * @param walletAddress - TON wallet address string.
- * @param fileName     - Output filename. Default: `'ton_wallet_results.txt'`
+ * @param fileName      - Output filename. Default: `'ton_wallet_results.txt'`
+ * @returns Promise that resolves when the file is written (never rejects — errors are logged).
  */
 export declare function saveResultsToFile(
     publicKey: string,
@@ -80,4 +105,4 @@ export declare function saveResultsToFile(
     words: string[] | string,
     walletAddress: string,
     fileName?: string
-): void;
+): Promise<void>;
