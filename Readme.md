@@ -73,14 +73,14 @@ node findWallet.js
 |-----------|------|---------|-------------|
 | `targetEnding` | `string` | required | Desired address ending. Latin letters, digits, `-`, `_` |
 | `showProcess` | `boolean` | `false` | Log each attempted address to console |
-| `showResult` | `boolean` | `true` | Log found wallet details to console |
+| `showResult` | `boolean` | `false` | Log found wallet details to console. **Keep `false` in shared/logged environments to avoid exposing private keys.** |
 | `saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` |
 
 ---
 
 ## API
 
-### `findWalletWithEnding() → Promise<Result>`
+### `findWalletWithEnding([options]) → Promise<Result>`
 
 Generates wallets until one matches the target ending. Returns:
 
@@ -90,6 +90,19 @@ Generates wallets until one matches the target ending. Returns:
 | `privateKey` | `string` | Private key (hex) |
 | `words` | `string[]` | 24-word mnemonic seed phrase |
 | `walletAddress` | `string` | TON address (e.g. `EQa...abc`) |
+
+**Cancellation** — pass an `AbortSignal` to stop the search at any time:
+
+```javascript
+const controller = new AbortController();
+setTimeout(() => controller.abort('timeout'), 30_000); // cancel after 30 s
+
+try {
+  const result = await finder.findWalletWithEnding({ signal: controller.signal });
+} catch (err) {
+  console.log('Search cancelled:', err.message);
+}
+```
 
 TypeScript declarations are included (`index.d.ts`).
 
@@ -101,12 +114,12 @@ Search time grows exponentially with ending length. Rough estimates on a modern 
 
 | Ending length | ~Attempts | ~Time |
 |--------------|-----------|-------|
-| 1 char | ~32 | instant |
-| 2 chars | ~1 000 | seconds |
-| 3 chars | ~32 000 | minutes |
-| 4 chars | ~1 000 000 | hours |
+| 1 char | ~64 | instant |
+| 2 chars | ~4 000 | seconds |
+| 3 chars | ~260 000 | minutes |
+| 4 chars | ~16 000 000 | hours |
 
-> The TON address alphabet is base64url, so each character has 64 possible values.
+> The TON address alphabet is base64url (A–Z, a–z, 0–9, `-`, `_`), so each character position has **64** possible values.
 
 ---
 
@@ -175,14 +188,14 @@ finder.findWalletWithEnding()
 |----------|-----|--------------|----------|
 | `targetEnding` | `string` | обязательный | Желаемое окончание адреса. Латиница, цифры, `-`, `_` |
 | `showProcess` | `boolean` | `false` | Выводить каждый проверяемый адрес в консоль |
-| `showResult` | `boolean` | `true` | Вывести найденный кошелёк в консоль |
+| `showResult` | `boolean` | `false` | Вывести найденный кошелёк в консоль. **Оставьте `false` в окружениях с логированием, чтобы не раскрывать приватный ключ.** |
 | `saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` |
 
 ### API
 
-#### `findWalletWithEnding() → Promise<Result>`
+#### `findWalletWithEnding([options]) → Promise<Result>`
 
-Генерирует кошельки, пока не найдёт совпадение. Возвращает:
+Генерирует кошельки, пока не найдёт совпадение. Поддерживает отмену через `AbortSignal`. Возвращает:
 
 | Поле | Тип | Описание |
 |------|-----|----------|
@@ -199,10 +212,10 @@ finder.findWalletWithEnding()
 
 | Длина окончания | ~Попыток | ~Время |
 |----------------|----------|--------|
-| 1 символ | ~32 | мгновенно |
-| 2 символа | ~1 000 | секунды |
-| 3 символа | ~32 000 | минуты |
-| 4 символа | ~1 000 000 | часы |
+| 1 символ | ~64 | мгновенно |
+| 2 символа | ~4 000 | секунды |
+| 3 символа | ~260 000 | минуты |
+| 4 символа | ~16 000 000 | часы |
 
 </details>
 

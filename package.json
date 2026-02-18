@@ -1,6 +1,6 @@
 {
   "name": "ton-wallet-finder",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "A library to find TON wallet addresses with a specific ending.",
   "main": "index.js",
   "scripts": {
@@ -31,6 +31,9 @@
     "chai": "^4.3.7",
     "mocha": "^10.2.0",
     "sinon": "^19.0.2"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "@ton/crypto": "^3.3.0",
