@@ -75,7 +75,7 @@ async function mnemonicNew() {
         for (let i = 0; i < 24; i++) {
             words.push(WORDLIST[buf.readUInt16BE(i * 2) % n]);
         }
-        if (await isBasicSeed(words)) return words;
+        if (await isBasicSeed(words)) { return words; }
     }
 }
 
