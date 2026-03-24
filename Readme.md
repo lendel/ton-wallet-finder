@@ -25,7 +25,8 @@ Find a wallet whose address ends with any string you choose.
 - [Options](#options)
 - [API](#api)
 - [Performance](#performance)
-- [Migration from v2](#-migration-from-v2)
+- [What's new in v4](#-whats-new-in-v4)
+- [Migration from v2/v3](#-migration-from-v2v3)
 - [Support the Author](#-support-the-author)
 - [License](#license)
 
@@ -123,9 +124,29 @@ Search time grows exponentially with ending length. Rough estimates on a modern 
 
 ---
 
-## 🔀 Migration from v2
+## 🚀 What's new in v4
 
-### v2 → v3 breaking changes
+Version 4.0.0 completely eliminates all production dependencies.
+
+Previous versions relied on `@ton/ton` and `@ton/crypto`, which pulled in a chain of **31 transitive packages** (including `tweetnacl`, `@ton/core`, `axios`, `jssha`, and others).
+
+Starting with v4, everything is implemented using **Node.js built-in modules only**:
+
+| What | How |
+|------|-----|
+| Mnemonic generation | `crypto.randomBytes` + bundled BIP-39 word list |
+| HMAC-SHA-512 / PBKDF2-SHA-512 | `crypto.createHmac` / `crypto.pbkdf2` |
+| Ed25519 key derivation | `crypto.createPrivateKey` with PKCS#8 seed wrapping |
+| WalletV4R2 address | TVM cell hash (SHA-256) + CRC-16/CCITT via `Buffer` |
+
+**Result:** `npm install ton-wallet-finder` now installs **0 additional packages**.
+The public API is identical — no code changes required when upgrading from v3.
+
+---
+
+## 🔀 Migration from v2/v3
+
+### v2/v3 → v4 breaking changes
 
 | What changed | v2 behaviour | v3 behaviour |
 |---|---|---|
@@ -267,9 +288,27 @@ try {
 | 3 символа | ~260 000 | минуты |
 | 4 символа | ~16 000 000 | часы |
 
-### Миграция с v2
+### Что нового в v4
 
-| Что изменилось | v2 | v3 |
+В версии 4.0.0 полностью отказались от избыточных внешних зависимостей.
+
+Предыдущие версии использовали `@ton/ton` и `@ton/crypto`, которые тянули за собой цепочку из **31 транзитивного пакета** (в том числе `tweetnacl`, `@ton/core`, `axios`, `jssha` и другие).
+
+Начиная с v4 всё реализовано исключительно на **встроенных модулях Node.js**:
+
+| Что | Как |
+|-----|-----|
+| Генерация мнемоники | `crypto.randomBytes` + встроенный список BIP-39 |
+| HMAC-SHA-512 / PBKDF2-SHA-512 | `crypto.createHmac` / `crypto.pbkdf2` |
+| Деривация ключа Ed25519 | `crypto.createPrivateKey` с обёрткой PKCS#8 |
+| Адрес WalletV4R2 | Хэш TVM-ячейки (SHA-256) + CRC-16/CCITT через `Buffer` |
+
+**Результат:** `npm install ton-wallet-finder` устанавливает **0 дополнительных пакетов**.
+Публичный API не изменился — при обновлении с v3 никаких правок в коде не требуется.
+
+### Миграция с v2/v3
+
+| Что изменилось | v2 | v3/v4 |
 |---|---|---|
 | Дефолт `showResult` | `true` | `false` |
 | `createWallet()` | `Promise<Address>` | `Address` (синхронно) |

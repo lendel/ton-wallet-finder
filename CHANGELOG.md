@@ -24,22 +24,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [4.0.0] — 2026-03-24
+
+### Breaking Changes
+- **Zero production dependencies.** `@ton/ton` and `@ton/crypto` (and their 29 transitive packages) are completely removed. The package now installs with no dependencies at all.
+
+### Changed
+- Mnemonic generation and validation reimplemented using Node.js built-in `crypto` (HMAC-SHA-512, PBKDF2-SHA-512) and a bundled BIP-39 word list (`wordlist.js`)
+- Ed25519 key derivation reimplemented using Node.js `crypto.createPrivateKey` with PKCS#8 DER seed wrapping — no `tweetnacl` required
+- WalletV4R2 address computation reimplemented as a pure TVM cell-hash algorithm (SHA-256 repr) with a hardcoded code-cell hash/depth constant — no `@ton/core` required
+- CRC-16/CCITT and base64url address encoding done via built-in `Buffer` — no external helpers
+- `wordlist.js` (BIP-39, 2048 words, MIT) added to the published package files
 
 ### Security
 - `saveResultsToFile` now writes with `mode: 0o600` — the output file is no longer world-readable, preventing other local users from reading exported private keys
 
 ### Fixed
-- Fixed dropped Promise / double-call pattern in null-options test; replaced `expect(async () => ...).to.not.throw()` with a proper `try/catch` that fails the test on unexpected throw
+- Fixed dropped Promise / double-call pattern in null-options test
 - Type validation added to `saveResultsToFile`: non-string `publicKey`, `privateKey`, or `walletAddress` now logs an error and returns early instead of writing malformed output
 
-### Changed
+### Infrastructure
 - ESLint now covers `test/` directory in addition to `index.js`
 - `npm run lint` script updated to `eslint index.js test/`
 - Added `AbortController` and `AbortSignal` globals to ESLint config for test files
-- Added `no-throw-literal` and `curly` rules to ESLint config (both `index.js` and `test/`)
+- Added `no-throw-literal` and `curly` rules to ESLint config
 - `FindOptions.signal` is now `readonly` in `index.d.ts`
-- Removed internal audit-code markers (`// m-1`, `// M-1:`, `// S-1:`, etc.) from source and test comments
+
+---
+
+## [Unreleased]
 
 ---
 
