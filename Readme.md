@@ -8,6 +8,7 @@
 ![CI](https://img.shields.io/github/actions/workflow/status/lendel/ton-wallet-finder/ci.yml?label=CI&style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-supported-blue?style=flat-square&logo=typescript)
 ![issues](https://img.shields.io/github/issues/lendel/ton-wallet-finder?style=flat-square)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lendel/ton-wallet-finder/badge)](https://scorecard.dev/viewer/?uri=github.com/lendel/ton-wallet-finder)
 
 **Vanity address generator for TON blockchain.**
 Find a wallet whose address ends with any string you choose.
