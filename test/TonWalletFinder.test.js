@@ -141,13 +141,25 @@ describe('TonWalletFinder', () => {
 
         it('should produce no console.log output when showResult and showProcess are both false', async function () {
             this.timeout(60000);
+            const finder = new TonWalletFinder('A', false, false, false);
+
+            // Stub crypto helpers so the test is deterministic and doesn't hang when
+            // console.log is replaced (some WASM-backed crypto libs bind console.log
+            // at initialisation and misbehave when the reference is swapped out).
+            const fakeKeyPair = { publicKey: Buffer.alloc(32), secretKey: Buffer.alloc(64) };
+            const createKeyPairStub = sinon.stub(finder, 'createKeyPair')
+                .resolves({ keyPair: fakeKeyPair, words: Array(24).fill('abandon') });
+            const createWalletStub = sinon.stub(finder, 'createWallet')
+                .returns({ toString: () => 'EQ' + 'A'.repeat(46) }); // 48-char address ending with 'A'
+
             const logStub = sinon.stub(console, 'log');
             try {
-                const finder = new TonWalletFinder('A', false, false, false);
                 await finder.findWalletWithEnding();
                 expect(logStub.callCount).to.equal(0);
             } finally {
                 logStub.restore();
+                createKeyPairStub.restore();
+                createWalletStub.restore();
             }
         });
 
