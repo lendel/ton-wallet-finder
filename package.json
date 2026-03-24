@@ -65,7 +65,7 @@
   },
   "homepage": "https://github.com/lendel/ton-wallet-finder#readme",
   "devDependencies": {
-    "chai": "4.3.7",
+    "chai": "6.2.2",
     "eslint": "10.1.0",
     "mocha": "11.7.5",
     "sinon": "21.0.3"
@@ -74,7 +74,9 @@
     "node": ">=20"
   },
   "overrides": {
-    "serialize-javascript": "^7.0.3"
+    "serialize-javascript": "^7.0.3",
+    "glob": "^13.0.0",
+    "diff": "^8.0.0"
   },
   "dependencies": {}
 }
