@@ -1,9 +1,7 @@
-'use strict';
-
-const { expect } = require('chai');
-const sinon = require('sinon');
-const fs = require('fs');
-const { TonWalletFinder, saveResultsToFile } = require('../index');
+import { expect } from 'chai';
+import sinon from 'sinon';
+import fs from 'node:fs';
+import { TonWalletFinder, saveResultsToFile } from '../index.js';
 
 describe('TonWalletFinder', () => {
 

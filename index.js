@@ -1,10 +1,8 @@
-'use strict';
+import { WalletContractV4 } from '@ton/ton';
+import { mnemonicNew, mnemonicToPrivateKey } from '@ton/crypto';
 
-const { WalletContractV4 } = require('@ton/ton');
-const { mnemonicNew, mnemonicToPrivateKey } = require('@ton/crypto');
-
-const fs   = require('fs');
-const path = require('path');
+import fs   from 'node:fs';
+import path from 'node:path';
 
 class TonWalletFinder {
     /**
@@ -129,11 +127,7 @@ async function saveResultsToFile(publicKey, privateKey, words, walletAddress, fi
         return;
     }
 
-    // require.main can be null in ESM environments and test frameworks
-    const scriptDirectory = require.main
-        ? path.dirname(require.main.filename)
-        : process.cwd();
-    const resultsFile = path.join(scriptDirectory, fileName);
+    const resultsFile = path.join(process.cwd(), fileName);
 
     // words may arrive as an array or as an already-joined string
     const wordsString = Array.isArray(words) ? words.join(' ') : words;
@@ -147,7 +141,7 @@ async function saveResultsToFile(publicKey, privateKey, words, walletAddress, fi
     }
 }
 
-module.exports = {
+export {
     TonWalletFinder,
     saveResultsToFile
 };

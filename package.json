@@ -3,9 +3,10 @@
   "version": "3.2.2",
   "description": "Vanity address generator for TON blockchain — find a WalletV4 address ending with any custom string.",
   "main": "index.js",
+  "type": "module",
   "exports": {
     ".": {
-      "require": "./index.js",
+      "import": "./index.js",
       "types": "./index.d.ts"
     }
   },
