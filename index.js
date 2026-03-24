@@ -35,10 +35,10 @@ function ed25519FromSeed(seed) {
 // ---------------------------------------------------------------------------
 
 /**
- * HMAC-SHA-512 with a string key and string/Buffer data.
+ * HMAC-SHA-512: key first, then data — matches @ton/crypto hmac_sha512(key, data) convention.
  */
-function hmacSha512(data, key) {
-    return crypto.createHmac('sha512', key).update(data).digest();
+function hmacSha512(key, data) {
+    return crypto.createHmac('sha512', Buffer.from(key)).update(Buffer.from(data)).digest();
 }
 
 /**
