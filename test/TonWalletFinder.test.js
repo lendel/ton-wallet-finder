@@ -3,7 +3,6 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
 const fs = require('fs');
-const path = require('path');
 const { TonWalletFinder, saveResultsToFile } = require('../index');
 
 describe('TonWalletFinder', () => {
@@ -43,9 +42,10 @@ describe('TonWalletFinder', () => {
             expect(finder.showProcess).to.equal(false);
         });
 
-        it('should default showResult to true', () => {
+        // Security: showResult defaults to false to avoid printing private keys in shared environments
+        it('should default showResult to false', () => {
             const finder = new TonWalletFinder('x');
-            expect(finder.showResult).to.equal(true);
+            expect(finder.showResult).to.equal(false);
         });
 
         it('should default saveResult to false', () => {
@@ -85,21 +85,23 @@ describe('TonWalletFinder', () => {
     });
 
     // -------------------------------------------------------------------------
-    // createWallet
+    // createWallet (synchronous)
     // -------------------------------------------------------------------------
     describe('createWallet()', () => {
-        it('should return an address object', async () => {
+        it('should return an address object synchronously (not a Promise)', async () => {
             const finder = new TonWalletFinder('a');
             const { keyPair } = await finder.createKeyPair();
-            const address = await finder.createWallet(keyPair);
-            expect(address).to.be.an('object');
-            expect(typeof address.toString).to.equal('function');
+            const result = finder.createWallet(keyPair);
+            // Must NOT be a Promise — the method is synchronous
+            expect(result).to.not.be.instanceOf(Promise);
+            expect(result).to.be.an('object');
+            expect(typeof result.toString).to.equal('function');
         });
 
-        it('should produce a bounceable URL-safe address starting with EQ or UQ', async () => {
+        it('should produce a bounceable URL-safe address starting with EQ or UQ and 48 chars long', async () => {
             const finder = new TonWalletFinder('a');
             const { keyPair } = await finder.createKeyPair();
-            const address = await finder.createWallet(keyPair);
+            const address = finder.createWallet(keyPair);
             const str = address.toString({ urlSafe: true, bounceable: true });
             expect(str).to.match(/^(EQ|UQ)/);
             expect(str).to.have.lengthOf(48);
@@ -107,11 +109,11 @@ describe('TonWalletFinder', () => {
     });
 
     // -------------------------------------------------------------------------
-    // findWalletWithEnding — functional test with short 1-char ending
+    // findWalletWithEnding
     // -------------------------------------------------------------------------
     describe('findWalletWithEnding()', () => {
         it('should find a wallet whose address ends with the given single character', async function () {
-            // Single character: ~1/62 chance per attempt → fast in practice
+            // Single character: ~1/64 chance per attempt → fast in practice
             this.timeout(60000);
             const target = 'A';
             const finder = new TonWalletFinder(target, false, false, false);
@@ -124,16 +126,39 @@ describe('TonWalletFinder', () => {
             expect(result.privateKey).to.match(/^[0-9a-f]{128}$/);
         });
 
+        // null argument must not throw TypeError
+        it('should work correctly when null is passed as options', async function () {
+            this.timeout(60000);
+            const finder = new TonWalletFinder('A', false, false, false);
+            let result;
+            try {
+                result = await finder.findWalletWithEnding(null);
+            } catch (err) {
+                expect.fail(`findWalletWithEnding(null) threw unexpectedly: ${err.message}`);
+            }
+            expect(result.walletAddress.endsWith('A')).to.equal(true);
+        });
+
+        it('should produce no console.log output when showResult and showProcess are both false', async function () {
+            this.timeout(60000);
+            const logStub = sinon.stub(console, 'log');
+            try {
+                const finder = new TonWalletFinder('A', false, false, false);
+                await finder.findWalletWithEnding();
+                expect(logStub.callCount).to.equal(0);
+            } finally {
+                logStub.restore();
+            }
+        });
+
         // BUG-01 regression: saveResult:true must NOT throw TypeError
         it('should call saveResultsToFile without TypeError when saveResult is true (BUG-01 regression)', async function () {
             this.timeout(60000);
-            const writeFileStub = sinon.stub(fs, 'writeFile').yields(null);
+            const writeFileStub = sinon.stub(fs.promises, 'writeFile').resolves();
             try {
                 const finder = new TonWalletFinder('A', false, false, true);
-                // Must not throw "words.join is not a function"
                 await finder.findWalletWithEnding();
                 expect(writeFileStub.calledOnce).to.equal(true);
-                // Verify the file content includes 'Words:'
                 const writtenData = writeFileStub.firstCall.args[1];
                 expect(writtenData).to.include('Words:');
                 expect(writtenData).to.include('Public Key:');
@@ -141,6 +166,75 @@ describe('TonWalletFinder', () => {
                 expect(writtenData).to.include('Wallet:');
             } finally {
                 writeFileStub.restore();
+            }
+        });
+
+        // AbortSignal cancellation
+        it('should reject with an Error when AbortSignal is triggered', async function () {
+            this.timeout(5000);
+            const finder = new TonWalletFinder('AAAAAAAAAA', false, false, false);
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort('Search cancelled by test'), 100);
+            let caughtError;
+            try {
+                await finder.findWalletWithEnding({ signal: controller.signal });
+            } catch (err) {
+                caughtError = err;
+            } finally {
+                clearTimeout(timer);
+            }
+            expect(caughtError).to.be.instanceOf(Error);
+            expect(caughtError.message).to.equal('Search cancelled by test');
+        });
+
+        it('should reject immediately when an already-aborted signal is passed', async function () {
+            this.timeout(5000);
+            const controller = new AbortController();
+            controller.abort('Pre-aborted');
+            const finder = new TonWalletFinder('A', false, false, false);
+            let caughtError;
+            try {
+                await finder.findWalletWithEnding({ signal: controller.signal });
+            } catch (err) {
+                caughtError = err;
+            }
+            expect(caughtError).to.be.instanceOf(Error);
+            expect(caughtError.message).to.equal('Pre-aborted');
+        });
+
+        // showProcess logging
+        it('should log each attempted address when showProcess is true', async function () {
+            this.timeout(60000);
+            const logStub = sinon.stub(console, 'log');
+            try {
+                const finder = new TonWalletFinder('A', true, false, false);
+                await finder.findWalletWithEnding();
+                const tryingCalls = logStub.getCalls().filter(c => c.args[0] === 'Trying address:');
+                expect(tryingCalls.length).to.be.at.least(1);
+            } finally {
+                logStub.restore();
+            }
+        });
+
+        // Error path: createKeyPair throws on first call, should recover and continue
+        it('should continue searching after a transient key generation error', async function () {
+            this.timeout(60000);
+            const finder = new TonWalletFinder('A', false, false, false);
+            let callCount = 0;
+            const original = finder.createKeyPair.bind(finder);
+            const stub = sinon.stub(finder, 'createKeyPair').callsFake(async () => {
+                callCount++;
+                if (callCount === 1) {
+                    throw new Error('simulated crypto error');
+                }
+                return original();
+            });
+            try {
+                const result = await finder.findWalletWithEnding();
+                expect(result).to.have.property('walletAddress');
+                expect(callCount).to.be.at.least(2);
+            } finally {
+                stub.restore();
             }
         });
     });
@@ -152,16 +246,16 @@ describe('TonWalletFinder', () => {
         let writeFileStub;
 
         beforeEach(() => {
-            writeFileStub = sinon.stub(fs, 'writeFile').yields(null);
+            writeFileStub = sinon.stub(fs.promises, 'writeFile').resolves();
         });
 
         afterEach(() => {
             writeFileStub.restore();
         });
 
-        it('should call fs.writeFile with correct path and content (words as array)', () => {
+        it('should call fs.promises.writeFile with correct path and content (words as array)', async () => {
             const words = ['word1', 'word2', 'word3'];
-            saveResultsToFile('pubkey', 'privkey', words, 'EQAbc123', 'test_output.txt');
+            await saveResultsToFile('pubkey', 'privkey', words, 'EQAbc123', 'test_output.txt');
             expect(writeFileStub.calledOnce).to.equal(true);
             const [filePath, data] = writeFileStub.firstCall.args;
             expect(filePath).to.include('test_output.txt');
@@ -171,28 +265,81 @@ describe('TonWalletFinder', () => {
             expect(data).to.include('Wallet: EQAbc123');
         });
 
-        it('should call fs.writeFile correctly when words is already a string (BUG-01 robustness)', () => {
-            // Guard against pre-joined strings being passed by external callers
-            saveResultsToFile('pubkey', 'privkey', 'word1 word2 word3', 'EQAbc123');
+        it('should call fs.promises.writeFile correctly when words is already a string (BUG-01 robustness)', async () => {
+            await saveResultsToFile('pubkey', 'privkey', 'word1 word2 word3', 'EQAbc123');
             expect(writeFileStub.calledOnce).to.equal(true);
             const [, data] = writeFileStub.firstCall.args;
             expect(data).to.include('Words: word1 word2 word3');
         });
 
-        it('should use default filename ton_wallet_results.txt', () => {
-            saveResultsToFile('pub', 'priv', ['w1'], 'EQX');
+        it('should use default filename ton_wallet_results.txt', async () => {
+            await saveResultsToFile('pub', 'priv', ['w1'], 'EQX');
             const [filePath] = writeFileStub.firstCall.args;
             expect(filePath).to.include('ton_wallet_results.txt');
         });
 
-        it('should log error if fs.writeFile fails', () => {
-            writeFileStub.restore();
-            writeFileStub = sinon.stub(fs, 'writeFile').yields(new Error('disk full'));
+        it('should log error to console if fs.promises.writeFile rejects', async () => {
+            writeFileStub.rejects(new Error('disk full'));
             const consoleErrorStub = sinon.stub(console, 'error');
             try {
-                saveResultsToFile('pub', 'priv', ['w'], 'EQ1');
+                await saveResultsToFile('pub', 'priv', ['w'], 'EQ1');
                 expect(consoleErrorStub.calledOnce).to.equal(true);
                 expect(consoleErrorStub.firstCall.args[0]).to.include('Error');
+            } finally {
+                consoleErrorStub.restore();
+            }
+        });
+
+        it('should log error and NOT call writeFile when publicKey is not a string', async () => {
+            const consoleErrorStub = sinon.stub(console, 'error');
+            try {
+                await saveResultsToFile(123, 'priv', ['w'], 'EQ1');
+                expect(writeFileStub.callCount).to.equal(0);
+                expect(consoleErrorStub.calledOnce).to.equal(true);
+                expect(consoleErrorStub.firstCall.args[0]).to.include('must be strings');
+            } finally {
+                consoleErrorStub.restore();
+            }
+        });
+
+        it('should return a Promise (function is async)', () => {
+            const result = saveResultsToFile('pub', 'priv', ['w'], 'EQ1');
+            expect(result).to.be.instanceOf(Promise);
+            return result;
+        });
+
+        // Path traversal protection
+        it('should reject path traversal in fileName and NOT call writeFile', async () => {
+            const consoleErrorStub = sinon.stub(console, 'error');
+            try {
+                await saveResultsToFile('pub', 'priv', ['w'], 'EQ1', '../../../etc/passwd');
+                // writeFile must NOT have been called
+                expect(writeFileStub.callCount).to.equal(0);
+                // An error message must have been logged
+                expect(consoleErrorStub.calledOnce).to.equal(true);
+                expect(consoleErrorStub.firstCall.args[0]).to.include('fileName');
+            } finally {
+                consoleErrorStub.restore();
+            }
+        });
+
+        it('should reject absolute paths in fileName', async () => {
+            const consoleErrorStub = sinon.stub(console, 'error');
+            try {
+                await saveResultsToFile('pub', 'priv', ['w'], 'EQ1', '/tmp/evil.txt');
+                expect(writeFileStub.callCount).to.equal(0);
+                expect(consoleErrorStub.calledOnce).to.equal(true);
+            } finally {
+                consoleErrorStub.restore();
+            }
+        });
+
+        it('should reject subdirectory paths in fileName', async () => {
+            const consoleErrorStub = sinon.stub(console, 'error');
+            try {
+                await saveResultsToFile('pub', 'priv', ['w'], 'EQ1', 'subdir/output.txt');
+                expect(writeFileStub.callCount).to.equal(0);
+                expect(consoleErrorStub.calledOnce).to.equal(true);
             } finally {
                 consoleErrorStub.restore();
             }
