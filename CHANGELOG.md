@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.2.0] - 2026-03-24
+
+### Added
+- `Readme.md` is now included in the published npm package (`files` field)
+- npm provenance attestation via `--provenance` flag on publish (verifiable on socket.dev and npmjs.com)
+
 ## [Unreleased]
 
 ### Security
