@@ -25,6 +25,7 @@ Find a wallet whose address ends with any string you choose.
 - [Options](#-options)
 - [API](#-api)
 - [Performance](#-performance)
+- [Migration from v2](#-migration-from-v2)
 - [Support the Author](#-support-the-author)
 - [License](#-license)
 
@@ -43,18 +44,17 @@ npm install ton-wallet-finder
 ## Quick Start
 
 ```javascript
-const { TonWalletFinder, saveResultsToFile } = require('ton-wallet-finder');
+const { TonWalletFinder } = require('ton-wallet-finder');
 
-const finder = new TonWalletFinder(
-  'abc',  // target ending
-  true,   // showProcess — log each attempt
-  true,   // showResult  — log found wallet
-  true    // saveResult  — save to ton_wallet_results.txt
-);
+// Note: the address alphabet is base64url — matching is case-sensitive.
+// 'abc' and 'ABC' are different patterns.
+const finder = new TonWalletFinder('abc');
 
 finder.findWalletWithEnding()
   .then(({ publicKey, privateKey, words, walletAddress }) => {
     console.log('Found:', walletAddress);
+    // Store publicKey, privateKey and words securely — do NOT log them
+    // in shared or CI environments.
   })
   .catch(console.error);
 ```
@@ -71,7 +71,7 @@ node findWallet.js
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `targetEnding` | `string` | required | Desired address ending. Latin letters, digits, `-`, `_` |
+| `targetEnding` | `string` | required | Desired address ending. Latin letters, digits, `-`, `_`. **Case-sensitive.** |
 | `showProcess` | `boolean` | `false` | Log each attempted address to console |
 | `showResult` | `boolean` | `false` | Log found wallet details to console. **Keep `false` in shared/logged environments to avoid exposing private keys.** |
 | `saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` |
@@ -123,6 +123,44 @@ Search time grows exponentially with ending length. Rough estimates on a modern 
 
 ---
 
+## 🔀 Migration from v2
+
+### v2 → v3 breaking changes
+
+| What changed | v2 behaviour | v3 behaviour |
+|---|---|---|
+| `showResult` default | `true` — printed private key to stdout by default | `false` — silent by default |
+| `createWallet()` | returned `Promise<Address>` | returns `Address` synchronously |
+| `saveResultsToFile()` | returned `void` (fire-and-forget) | returns `Promise<void>` (awaited) |
+
+### Migration checklist
+
+1. **`showResult`** — if you relied on the default console output, pass `showResult: true` explicitly:
+   ```js
+   // v2 (implicit)
+   new TonWalletFinder('abc');
+   // v3 equivalent
+   new TonWalletFinder('abc', false, true);
+   ```
+
+2. **`createWallet()`** — if you called it with `await`, remove the `await`:
+   ```js
+   // v2
+   const address = await finder.createWallet(keyPair);
+   // v3
+   const address = finder.createWallet(keyPair);
+   ```
+
+3. **`saveResultsToFile()`** — if you called it standalone, add `await`:
+   ```js
+   // v2
+   saveResultsToFile(pub, priv, words, addr);
+   // v3
+   await saveResultsToFile(pub, priv, words, addr);
+   ```
+
+---
+
 ## 💖 Support the Author
 
 If this library saved you time — a small thank-you goes a long way!
@@ -166,18 +204,17 @@ npm install ton-wallet-finder
 ### Быстрый старт
 
 ```javascript
-const { TonWalletFinder, saveResultsToFile } = require('ton-wallet-finder');
+const { TonWalletFinder } = require('ton-wallet-finder');
 
-const finder = new TonWalletFinder(
-  'abc',  // желаемое окончание адреса
-  true,   // showProcess — выводить каждую попытку
-  true,   // showResult  — вывести найденный кошелёк
-  true    // saveResult  — сохранить в ton_wallet_results.txt
-);
+// Алфавит адреса — base64url, поиск регистрозависим.
+// 'abc' и 'ABC' — разные паттерны.
+const finder = new TonWalletFinder('abc');
 
 finder.findWalletWithEnding()
   .then(({ publicKey, privateKey, words, walletAddress }) => {
     console.log('Найдено:', walletAddress);
+    // publicKey, privateKey и words храните безопасно —
+    // не выводите в логи в shared/CI-окружениях.
   })
   .catch(console.error);
 ```
@@ -186,7 +223,7 @@ finder.findWalletWithEnding()
 
 | Параметр | Тип | По умолчанию | Описание |
 |----------|-----|--------------|----------|
-| `targetEnding` | `string` | обязательный | Желаемое окончание адреса. Латиница, цифры, `-`, `_` |
+| `targetEnding` | `string` | обязательный | Желаемое окончание адреса. Латиница, цифры, `-`, `_`. **Регистрозависимо.** |
 | `showProcess` | `boolean` | `false` | Выводить каждый проверяемый адрес в консоль |
 | `showResult` | `boolean` | `false` | Вывести найденный кошелёк в консоль. **Оставьте `false` в окружениях с логированием, чтобы не раскрывать приватный ключ.** |
 | `saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` |
@@ -204,6 +241,19 @@ finder.findWalletWithEnding()
 | `words` | `string[]` | 24-словная мнемоническая фраза |
 | `walletAddress` | `string` | Адрес TON (например, `EQa...abc`) |
 
+**Отмена поиска** — передайте `AbortSignal` для остановки в любой момент:
+
+```javascript
+const controller = new AbortController();
+setTimeout(() => controller.abort('таймаут'), 30_000); // отмена через 30 с
+
+try {
+  const result = await finder.findWalletWithEnding({ signal: controller.signal });
+} catch (err) {
+  console.log('Поиск отменён:', err.message);
+}
+```
+
 Поставляется с декларациями TypeScript (`index.d.ts`).
 
 ### Производительность
@@ -216,6 +266,14 @@ finder.findWalletWithEnding()
 | 2 символа | ~4 000 | секунды |
 | 3 символа | ~260 000 | минуты |
 | 4 символа | ~16 000 000 | часы |
+
+### Миграция с v2
+
+| Что изменилось | v2 | v3 |
+|---|---|---|
+| Дефолт `showResult` | `true` | `false` |
+| `createWallet()` | `Promise<Address>` | `Address` (синхронно) |
+| `saveResultsToFile()` | `void` | `Promise<void>` |
 
 </details>
 
