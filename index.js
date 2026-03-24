@@ -53,7 +53,7 @@ class TonWalletFinder {
      */
     async findWalletWithEnding(options = {}) {
         // S-1: safe destructure — works correctly for undefined AND null
-        const { signal } = options != null ? options : {};
+        const { signal } = options !== null ? options : {};
 
         let keyPair;
         let words;

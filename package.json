@@ -1,10 +1,24 @@
 {
   "name": "ton-wallet-finder",
-  "version": "3.0.0",
-  "description": "A library to find TON wallet addresses with a specific ending.",
+  "version": "3.1.0",
+  "description": "Vanity address generator for TON blockchain — find a WalletV4 address ending with any custom string.",
   "main": "index.js",
+  "exports": {
+    ".": {
+      "require": "./index.js",
+      "types":   "./index.d.ts"
+    }
+  },
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
   "scripts": {
-    "test": "mocha --recursive --exit"
+    "lint": "eslint index.js",
+    "test": "mocha --recursive"
   },
   "repository": {
     "type": "git",
@@ -18,10 +32,31 @@
     "vanity",
     "mnemonic",
     "ton-blockchain",
-    "ton-wallet"
+    "ton-wallet",
+    "base64url",
+    "ed25519",
+    "seed-phrase",
+    "toncoin",
+    "cryptography"
   ],
-  "types": "index.d.ts",
-  "author": "Lendel",
+  "author": {
+    "name": "Lendel",
+    "url": "https://github.com/lendel"
+  },
+  "funding": [
+    {
+      "type": "cryptocurrency",
+      "url": "https://app.tonkeeper.com/transfer/UQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJSau"
+    },
+    {
+      "type": "paypal",
+      "url": "https://www.paypal.me/lendelkz"
+    },
+    {
+      "type": "ko_fi",
+      "url": "https://ko-fi.com/lendelkz"
+    }
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/lendel/ton-wallet-finder/issues"
@@ -29,14 +64,15 @@
   "homepage": "https://github.com/lendel/ton-wallet-finder#readme",
   "devDependencies": {
     "chai": "^4.3.7",
-    "mocha": "^10.2.0",
-    "sinon": "^19.0.2"
+    "eslint": "^10.1.0",
+    "mocha": "^11.7.5",
+    "sinon": "^21.0.3"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
     "@ton/crypto": "^3.3.0",
-    "@ton/ton": "^15.2.1"
+    "@ton/ton": "^16.2.2"
   }
 }

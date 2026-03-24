@@ -3,13 +3,13 @@
  */
 export interface WalletResult {
     /** Hex-encoded Ed25519 public key (64 characters) */
-    publicKey: string;
+    readonly publicKey: string;
     /** Hex-encoded Ed25519 private key / secret key (128 characters) */
-    privateKey: string;
+    readonly privateKey: string;
     /** 24-word BIP39 mnemonic seed phrase */
-    words: string[];
+    readonly words: readonly string[];
     /** TON wallet address in URL-safe bounceable format (e.g. EQ...) */
-    walletAddress: string;
+    readonly walletAddress: string;
 }
 
 /**
