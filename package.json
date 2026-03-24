@@ -71,6 +71,9 @@
   "engines": {
     "node": ">=18"
   },
+  "overrides": {
+    "serialize-javascript": "^7.0.3"
+  },
   "dependencies": {
     "@ton/crypto": "^3.3.0",
     "@ton/ton": "^16.2.2"
