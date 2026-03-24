@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Readme.md` is now included in the published npm package (`files` field)
 - npm provenance attestation via `--provenance` flag on publish (verifiable on socket.dev and npmjs.com)
 
+## [3.2.2] - 2026-03-24
+
+### Security
+- All dependency versions pinned to exact values (removed `^` ranges) — eliminates
+  semver drift risk; package installs are now reproducible at the manifest level,
+  not just via the lockfile
+- GitHub Actions steps pinned to commit hashes (already in 3.2.1)
+- npm provenance attestation on publish via `--provenance` (already in 3.2.0)
+
+---
+
 ## [Unreleased]
 
 ### Security
