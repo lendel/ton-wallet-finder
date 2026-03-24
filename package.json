@@ -12,6 +12,7 @@
   "types": "index.d.ts",
   "files": [
     "index.js",
+    "wordlist.js",
     "index.d.ts",
     "CHANGELOG.md",
     "Readme.md"
@@ -75,8 +76,5 @@
   "overrides": {
     "serialize-javascript": "^7.0.3"
   },
-  "dependencies": {
-    "@ton/crypto": "3.3.0",
-    "@ton/ton": "16.2.2"
-  }
+  "dependencies": {}
 }

@@ -1,10 +1,196 @@
 'use strict';
 
-const { WalletContractV4 } = require('@ton/ton');
-const { mnemonicNew, mnemonicToPrivateKey } = require('@ton/crypto');
+const crypto = require('crypto');
+const fs     = require('fs');
+const path   = require('path');
 
-const fs   = require('fs');
-const path = require('path');
+const WORDLIST = require('./wordlist');
+
+// ---------------------------------------------------------------------------
+// Ed25519 helpers (Node.js built-in crypto, no external deps)
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive an Ed25519 key pair from a 32-byte seed.
+ * Returns { publicKey: Buffer(32), secretKey: Buffer(64) } — same layout as
+ * tweetnacl so the rest of the code is unaffected.
+ */
+function ed25519FromSeed(seed) {
+    // Wrap the raw seed in a minimal PKCS#8 DER structure that Node understands.
+    // Header: SEQUENCE { INTEGER 0, SEQUENCE { OID 1.3.101.112 }, OCTET STRING { OCTET STRING(32) } }
+    const pkcs8Header = Buffer.from('302e020100300506032b657004220420', 'hex');
+    const pkcs8Der    = Buffer.concat([pkcs8Header, seed]);
+    const priv        = crypto.createPrivateKey({ key: pkcs8Der, format: 'der', type: 'pkcs8' });
+    const pub         = crypto.createPublicKey(priv);
+    // SPKI DER for Ed25519 ends with the 32-byte raw public key.
+    const spki        = pub.export({ format: 'der', type: 'spki' });
+    const publicKey   = spki.slice(-32);
+    // tweetnacl-compatible 64-byte secretKey = seed ‖ publicKey
+    const secretKey   = Buffer.concat([seed, publicKey]);
+    return { publicKey, secretKey };
+}
+
+// ---------------------------------------------------------------------------
+// TON mnemonic (no password variant — same as wallet usage)
+// ---------------------------------------------------------------------------
+
+/**
+ * HMAC-SHA-512 with a string key and string/Buffer data.
+ */
+function hmacSha512(data, key) {
+    return crypto.createHmac('sha512', key).update(data).digest();
+}
+
+/**
+ * PBKDF2-SHA-512 wrapper (promisified).
+ */
+function pbkdf2Sha512(password, salt, iterations, keylen) {
+    return new Promise((resolve, reject) =>
+        crypto.pbkdf2(password, salt, iterations, keylen, 'sha512',
+            (err, derived) => err ? reject(err) : resolve(derived))
+    );
+}
+
+/**
+ * Check if the mnemonic array is a valid TON "basic seed" (no password).
+ * Algorithm mirrors tonlib Mnemonic::is_basic_seed().
+ */
+async function isBasicSeed(words) {
+    const entropy = hmacSha512(words.join(' '), '');
+    const seed    = await pbkdf2Sha512(entropy, 'TON seed version',
+        Math.max(1, Math.floor(100000 / 256)), 64);
+    return seed[0] === 0;
+}
+
+/**
+ * Generate a fresh 24-word TON mnemonic.
+ * Loops until the TON seed-version check passes (≈ 1 in 256 attempts).
+ */
+async function mnemonicNew() {
+    const n = WORDLIST.length; // 2048
+    while (true) {
+        // 2 bytes per word; 65536 / 2048 = 32 — no modulo bias.
+        const buf   = crypto.randomBytes(24 * 2);
+        const words = [];
+        for (let i = 0; i < 24; i++) {
+            words.push(WORDLIST[buf.readUInt16BE(i * 2) % n]);
+        }
+        if (await isBasicSeed(words)) return words;
+    }
+}
+
+/**
+ * Derive an Ed25519 key pair from a TON mnemonic (no password).
+ * Returns { publicKey: Buffer(32), secretKey: Buffer(64) }.
+ */
+async function mnemonicToPrivateKey(words) {
+    const norm    = words.map(w => w.toLowerCase().trim());
+    const entropy = hmacSha512(norm.join(' '), '');
+    const seed64  = await pbkdf2Sha512(entropy, 'TON default seed', 100000, 64);
+    return ed25519FromSeed(seed64.slice(0, 32));
+}
+
+// ---------------------------------------------------------------------------
+// WalletV4 address derivation (pure TVM cell hashing, no @ton/core)
+// ---------------------------------------------------------------------------
+
+// Pre-computed constants for the WalletV4R2 code cell (fixed bytecode).
+// hash = SHA-256 of the code cell repr; depth = max ref depth + 1.
+const CODE_HASH  = Buffer.from(
+    'feb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0', 'hex');
+const CODE_DEPTH = 7;
+
+/**
+ * Compute the TVM-standard SHA-256 hash of a single ordinary cell.
+ *
+ * @param {number}   bitsCount  - number of data bits
+ * @param {Buffer}   bitsBytes  - bit data, already padded (see padBits)
+ * @param {Array}    refs       - array of { depth: number, hash: Buffer(32) }
+ */
+function cellHash(bitsCount, bitsBytes, refs) {
+    const d1      = refs.length;                                    // refs count (ordinary, level 0)
+    const d2      = Math.ceil(bitsCount / 8) + Math.floor(bitsCount / 8);
+    const dataLen = Math.ceil(bitsCount / 8);
+    const repr    = Buffer.alloc(2 + dataLen + refs.length * 34);  // 34 = 2 depth + 32 hash
+    let   cur     = 0;
+
+    repr[cur++] = d1;
+    repr[cur++] = d2;
+    bitsBytes.copy(repr, cur);  cur += dataLen;
+
+    for (const r of refs) {
+        repr[cur++] = (r.depth >> 8) & 0xff;
+        repr[cur++] =  r.depth       & 0xff;
+    }
+    for (const r of refs) {
+        r.hash.copy(repr, cur);  cur += 32;
+    }
+    return crypto.createHash('sha256').update(repr).digest();
+}
+
+/**
+ * Apply TVM padding: if bits is not byte-aligned, set the first unused bit to 1
+ * and clear the rest of the byte.
+ */
+function padBits(bitsCount, bitsBytes) {
+    const result = Buffer.from(bitsBytes.slice(0, Math.ceil(bitsCount / 8)));
+    if (bitsCount % 8 !== 0) {
+        const rem     = bitsCount % 8;
+        const padMask = 0x80 >> rem;
+        result[result.length - 1] =
+            (result[result.length - 1] & ~(padMask - 1)) | padMask;
+    }
+    return result;
+}
+
+/**
+ * Derive a WalletV4 (workchain 0) address from a 32-byte Ed25519 public key.
+ * Returns a bounceable, URL-safe base64 string (48 chars).
+ */
+function walletV4Address(pubkey, workchain = 0) {
+    const subwalletId = 698983191 + workchain;
+
+    // ---- Data cell: seqno(32) | subwallet_id(32) | pubkey(256) | has_plugins(1) ----
+    // Total = 321 bits; last byte: has_plugins=0 + padding bit 1 + 000000 = 0x40
+    const dataBuf = Buffer.alloc(41, 0);
+    dataBuf.writeUInt32BE(0,           0);  // seqno
+    dataBuf.writeUInt32BE(subwalletId, 4);  // subwallet_id
+    pubkey.copy(dataBuf, 8);                // 32 bytes public key
+    dataBuf[40] = 0x40;                     // padding for the trailing 1 bit
+    const dataHash  = cellHash(321, padBits(321, dataBuf), []);
+    const dataDepth = 0;
+
+    // ---- StateInit cell: bits = 00110 (5 bits), refs = [code, data] ----
+    // 00110 padded => 00110_100 = 0x34
+    const siPadded = padBits(5, Buffer.from([0b00110000]));
+    const siHash   = cellHash(5, siPadded, [
+        { depth: CODE_DEPTH, hash: CODE_HASH },
+        { depth: dataDepth,  hash: dataHash  },
+    ]);
+
+    // ---- User-friendly address: [tag, wc, hash(32), crc16(2)] => base64url ----
+    const addr = Buffer.alloc(36);
+    addr[0] = 0x11;                    // bounceable flag
+    addr.writeInt8(workchain, 1);      // workchain (signed byte)
+    siHash.copy(addr, 2);
+
+    let crc = 0;
+    for (let i = 0; i < 34; i++) {
+        crc ^= addr[i] << 8;
+        for (let j = 0; j < 8; j++) {
+            crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+        }
+        crc &= 0xffff;
+    }
+    addr[34] = (crc >> 8) & 0xff;
+    addr[35] =  crc       & 0xff;
+
+    return addr.toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+// ---------------------------------------------------------------------------
+// TonWalletFinder
+// ---------------------------------------------------------------------------
 
 class TonWalletFinder {
     /**
@@ -34,13 +220,12 @@ class TonWalletFinder {
         return { keyPair, words };
     }
 
-    // Create a WalletV4 contract and return its Address object (synchronous)
+    // Derive a WalletV4 address from a key pair.
+    // Returns an address object with a .toString() method — same interface as
+    // the original @ton/core Address so callers are unaffected.
     createWallet(keyPair) {
-        const wallet = WalletContractV4.create({
-            workchain: 0,                            // TON mainnet
-            publicKey: Buffer.from(keyPair.publicKey)
-        });
-        return wallet.address;
+        const str = walletV4Address(Buffer.from(keyPair.publicKey));
+        return { toString: () => str };
     }
 
     /**
@@ -149,5 +334,5 @@ async function saveResultsToFile(publicKey, privateKey, words, walletAddress, fi
 
 module.exports = {
     TonWalletFinder,
-    saveResultsToFile
+    saveResultsToFile,
 };
