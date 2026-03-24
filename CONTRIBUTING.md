@@ -21,7 +21,7 @@ npm install
 | Command | Description |
 |---------|-------------|
 | `npm test` | Run the full test suite (Mocha) |
-| `npm run lint` | Run ESLint on `index.js` |
+| `npm run lint` | Run ESLint on `index.js` and `test/` |
 
 ---
 

@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `saveResultsToFile` now writes with `mode: 0o600` — the output file is no longer world-readable, preventing other local users from reading exported private keys
 
 ### Fixed
-- S-1 test: removed dropped Promise / double-call pattern; replaced `expect(async () => ...).to.not.throw()` with a proper `try/catch` that fails the test on unexpected throw
+- Fixed dropped Promise / double-call pattern in null-options test; replaced `expect(async () => ...).to.not.throw()` with a proper `try/catch` that fails the test on unexpected throw
 - Type validation added to `saveResultsToFile`: non-string `publicKey`, `privateKey`, or `walletAddress` now logs an error and returns early instead of writing malformed output
 
 ### Changed

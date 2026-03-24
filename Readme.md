@@ -12,7 +12,7 @@
 **Vanity address generator for TON blockchain.**
 Find a wallet whose address ends with any string you choose.
 
-[English](#-installation) · [Русский](#-установка)
+[English](#-installation) · [Русский](#установка)
 
 </div>
 
@@ -21,13 +21,13 @@ Find a wallet whose address ends with any string you choose.
 ## Table of Contents
 
 - [Installation](#-installation)
-- [Quick Start](#-quick-start)
-- [Options](#-options)
-- [API](#-api)
-- [Performance](#-performance)
+- [Quick Start](#quick-start)
+- [Options](#options)
+- [API](#api)
+- [Performance](#performance)
 - [Migration from v2](#-migration-from-v2)
 - [Support the Author](#-support-the-author)
-- [License](#-license)
+- [License](#license)
 
 ---
 
