@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Security
+- `saveResultsToFile` now writes with `mode: 0o600` — the output file is no longer world-readable, preventing other local users from reading exported private keys
+
+### Fixed
+- S-1 test: removed dropped Promise / double-call pattern; replaced `expect(async () => ...).to.not.throw()` with a proper `try/catch` that fails the test on unexpected throw
+- Type validation added to `saveResultsToFile`: non-string `publicKey`, `privateKey`, or `walletAddress` now logs an error and returns early instead of writing malformed output
+
+### Changed
+- ESLint now covers `test/` directory in addition to `index.js`
+- `npm run lint` script updated to `eslint index.js test/`
+- Added `AbortController` and `AbortSignal` globals to ESLint config for test files
+- Added `no-throw-literal` and `curly` rules to ESLint config (both `index.js` and `test/`)
+- `FindOptions.signal` is now `readonly` in `index.d.ts`
+- Removed internal audit-code markers (`// m-1`, `// M-1:`, `// S-1:`, etc.) from source and test comments
+
+---
+
 ## [3.1.0] — 2025-03-24
 
 ### Added

@@ -126,21 +126,20 @@ describe('TonWalletFinder', () => {
             expect(result.privateKey).to.match(/^[0-9a-f]{128}$/);
         });
 
-        // S-1: null argument must not throw TypeError
-        it('should work correctly when null is passed as options (S-1)', async function () {
+        // null argument must not throw TypeError
+        it('should work correctly when null is passed as options', async function () {
             this.timeout(60000);
             const finder = new TonWalletFinder('A', false, false, false);
             let result;
-            // Must not throw "Cannot destructure property 'signal' of null"
-            expect(async () => {
+            try {
                 result = await finder.findWalletWithEnding(null);
-            }).to.not.throw();
-            result = await finder.findWalletWithEnding(null);
+            } catch (err) {
+                expect.fail(`findWalletWithEnding(null) threw unexpectedly: ${err.message}`);
+            }
             expect(result.walletAddress.endsWith('A')).to.equal(true);
         });
 
-        // S-2: no console.log output when showResult=false and showProcess=false
-        it('should produce no console.log output when showResult and showProcess are both false (S-2)', async function () {
+        it('should produce no console.log output when showResult and showProcess are both false', async function () {
             this.timeout(60000);
             const logStub = sinon.stub(console, 'log');
             try {
@@ -235,7 +234,7 @@ describe('TonWalletFinder', () => {
                 expect(result).to.have.property('walletAddress');
                 expect(callCount).to.be.at.least(2);
             } finally {
-                stub.restore(); // M-7: always restore stubs
+                stub.restore();
             }
         });
     });
@@ -291,14 +290,26 @@ describe('TonWalletFinder', () => {
             }
         });
 
+        it('should log error and NOT call writeFile when publicKey is not a string', async () => {
+            const consoleErrorStub = sinon.stub(console, 'error');
+            try {
+                await saveResultsToFile(123, 'priv', ['w'], 'EQ1');
+                expect(writeFileStub.callCount).to.equal(0);
+                expect(consoleErrorStub.calledOnce).to.equal(true);
+                expect(consoleErrorStub.firstCall.args[0]).to.include('must be strings');
+            } finally {
+                consoleErrorStub.restore();
+            }
+        });
+
         it('should return a Promise (function is async)', () => {
             const result = saveResultsToFile('pub', 'priv', ['w'], 'EQ1');
             expect(result).to.be.instanceOf(Promise);
             return result;
         });
 
-        // C-1: Path traversal protection
-        it('should reject path traversal in fileName and NOT call writeFile (C-1)', async () => {
+        // Path traversal protection
+        it('should reject path traversal in fileName and NOT call writeFile', async () => {
             const consoleErrorStub = sinon.stub(console, 'error');
             try {
                 await saveResultsToFile('pub', 'priv', ['w'], 'EQ1', '../../../etc/passwd');
@@ -312,7 +323,7 @@ describe('TonWalletFinder', () => {
             }
         });
 
-        it('should reject absolute paths in fileName (C-1)', async () => {
+        it('should reject absolute paths in fileName', async () => {
             const consoleErrorStub = sinon.stub(console, 'error');
             try {
                 await saveResultsToFile('pub', 'priv', ['w'], 'EQ1', '/tmp/evil.txt');
@@ -323,7 +334,7 @@ describe('TonWalletFinder', () => {
             }
         });
 
-        it('should reject subdirectory paths in fileName (C-1)', async () => {
+        it('should reject subdirectory paths in fileName', async () => {
             const consoleErrorStub = sinon.stub(console, 'error');
             try {
                 await saveResultsToFile('pub', 'priv', ['w'], 'EQ1', 'subdir/output.txt');

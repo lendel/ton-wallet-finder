@@ -1,4 +1,4 @@
-'use strict'; // m-1
+'use strict';
 
 const { WalletContractV4 } = require('@ton/ton');
 const { mnemonicNew, mnemonicToPrivateKey } = require('@ton/crypto');
@@ -15,7 +15,7 @@ class TonWalletFinder {
      * @param {boolean} [saveResult=false]  - Save result to ton_wallet_results.txt
      */
     constructor(targetEnding, showProcess = false, showResult = false, saveResult = false) {
-        // M-1: dash placed at the end of the character class to avoid ambiguous range `9-_`
+        // Dash at end of character class avoids ambiguous range
         const validEndingRegex = /^[a-zA-Z0-9_-]+$/;
         if (!validEndingRegex.test(targetEnding)) {
             throw new Error('Invalid target ending. Only Latin letters, numbers, dashes, and underscores are allowed.');
@@ -47,17 +47,17 @@ class TonWalletFinder {
      * Search for a wallet whose address ends with `this.targetEnding`.
      * The comparison is case-sensitive.
      *
-     * @param {object}      [options={}]    - S-1: accepts plain object or undefined/null-safe default
+     * @param {object}      [options={}]    - Optional configuration.
      * @param {AbortSignal} [options.signal] - Optional AbortSignal to cancel the search.
      * @returns {Promise<{ publicKey: string, privateKey: string, words: string[], walletAddress: string }>}
      */
     async findWalletWithEnding(options = {}) {
-        // S-1: safe destructure — works correctly for undefined AND null
+        // Safe destructure — works correctly for both undefined and null
         const { signal } = options !== null ? options : {};
 
         let keyPair;
         let words;
-        // M-2: declared once outside the loop; reused after the loop exits
+        // Declared once outside the loop; reused after the loop exits
         let walletAddress;
         let found = false;
 
@@ -74,12 +74,8 @@ class TonWalletFinder {
 
             try {
                 ({ keyPair, words } = await this.createKeyPair());
-                // M-2: assign to the outer variable — no second toString() needed later
                 walletAddress = this.createWallet(keyPair).toString({ urlSafe: true, bounceable: true });
             } catch (err) {
-                // S-3: removed dead `err.name === 'AbortError'` guard —
-                //      the signal is never passed to inner crypto calls so AbortError
-                //      cannot originate here; our own abort throw (above) is outside try.
                 console.error('Error generating wallet, retrying:', err.message);
                 continue;
             }
@@ -95,8 +91,6 @@ class TonWalletFinder {
         const publicKey  = Buffer.from(keyPair.publicKey).toString('hex');
         const privateKey = Buffer.from(keyPair.secretKey).toString('hex');
 
-        // S-2: removed unconditional `else { console.log('The search is over.') }`.
-        //      When showResult is false the library is now completely silent.
         if (this.showResult) {
             console.log('Public Key:',  publicKey);
             console.log('Private Key:', privateKey);
@@ -124,8 +118,12 @@ class TonWalletFinder {
  * @returns {Promise<void>}
  */
 async function saveResultsToFile(publicKey, privateKey, words, walletAddress, fileName = 'ton_wallet_results.txt') {
-    // C-1: Path traversal guard — fileName must be a plain name, not a path.
-    //      path.basename('../../evil') === 'evil' ≠ '../../evil', so the check rejects traversal.
+    if (typeof publicKey !== 'string' || typeof privateKey !== 'string' || typeof walletAddress !== 'string') {
+        console.error('Error: publicKey, privateKey, and walletAddress must be strings.');
+        return;
+    }
+
+    // Path traversal guard — fileName must be a plain filename, not a path.
     if (path.basename(fileName) !== fileName) {
         console.error('Error: fileName must be a plain filename without path separators.');
         return;
@@ -142,7 +140,7 @@ async function saveResultsToFile(publicKey, privateKey, words, walletAddress, fi
     const data = `Public Key: ${publicKey}\nPrivate Key: ${privateKey}\nWords: ${wordsString}\nWallet: ${walletAddress}\n`;
 
     try {
-        await fs.promises.writeFile(resultsFile, data);
+        await fs.promises.writeFile(resultsFile, data, { mode: 0o600 });
         console.log(`Results saved to ${resultsFile}`);
     } catch (err) {
         console.error('Error while writing results to file:', err);

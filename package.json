@@ -17,7 +17,7 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "lint": "eslint index.js",
+    "lint": "eslint index.js test/",
     "test": "mocha --recursive"
   },
   "repository": {

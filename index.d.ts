@@ -21,7 +21,7 @@ export interface FindOptions {
      * When aborted, `findWalletWithEnding` rejects with an Error whose message
      * is taken from `signal.reason` (if a string) or `'Wallet search aborted'`.
      */
-    signal?: AbortSignal;
+    readonly signal?: AbortSignal;
 }
 
 /**
