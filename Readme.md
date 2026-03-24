@@ -18,6 +18,10 @@ Find a wallet whose address ends with any string you choose.
 
 ---
 
+**Security: 0 dependencies, 0 network calls. Verified pure logic. The "Network access" flag in some scanners is a false positive caused by the funding links in package.json.**
+
+---
+
 ## Table of Contents
 
 - [Installation](#-installation)
@@ -38,7 +42,7 @@ Find a wallet whose address ends with any string you choose.
 npm install ton-wallet-finder
 ```
 
-> Requires Node.js 18 or higher.
+> Requires Node.js 20 or higher.
 
 ---
 
@@ -220,7 +224,7 @@ Thank you for your support! 💙
 npm install ton-wallet-finder
 ```
 
-> Требуется Node.js 18 или выше.
+> Требуется Node.js 20 или выше.
 
 ### Быстрый старт
 
