@@ -106,9 +106,16 @@ describe('TonWalletFinder', () => {
             expect(finder.workers).to.equal('auto');
         });
 
+        it('should accept every supported walletVersion', () => {
+            for (const v of ['v3r2', 'v4r2', 'v5r1']) {
+                const finder = new TonWalletFinder('x', { walletVersion: v });
+                expect(finder.walletVersion).to.equal(v);
+            }
+        });
+
         it('should throw on an unsupported walletVersion', () => {
-            expect(() => new TonWalletFinder('x', { walletVersion: 'v3r2' })).to.throw(Error, /walletVersion/);
-            expect(() => new TonWalletFinder('x', { walletVersion: 'v5r1' })).to.throw(Error, /walletVersion/);
+            expect(() => new TonWalletFinder('x', { walletVersion: 'v4' })).to.throw(Error, /walletVersion/);
+            expect(() => new TonWalletFinder('x', { walletVersion: 'V4R2' })).to.throw(Error, /walletVersion/);
             expect(() => new TonWalletFinder('x', { walletVersion: 'bogus' })).to.throw(Error, /walletVersion/);
         });
     });
@@ -164,6 +171,15 @@ describe('TonWalletFinder', () => {
             const str = address.toString({ urlSafe: true, bounceable: true });
             expect(str).to.match(/^(EQ|UQ)/);
             expect(str).to.have.lengthOf(48);
+        });
+
+        it('should derive the address for the configured walletVersion', async () => {
+            const { walletV3R2Address, walletV4Address, walletV5R1Address } = require('../index')._internals;
+            const { keyPair } = await new TonWalletFinder('a').createKeyPair();
+            const pubkey = Buffer.from(keyPair.publicKey);
+            expect(new TonWalletFinder('a', { walletVersion: 'v3r2' }).createWallet(keyPair).toString()).to.equal(walletV3R2Address(pubkey));
+            expect(new TonWalletFinder('a').createWallet(keyPair).toString()).to.equal(walletV4Address(pubkey));
+            expect(new TonWalletFinder('a', { walletVersion: 'v5r1' }).createWallet(keyPair).toString()).to.equal(walletV5R1Address(pubkey));
         });
     });
 

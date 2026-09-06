@@ -14,9 +14,11 @@ export interface WalletResult {
 
 /**
  * TON wallet contract version to derive the address for.
- * Currently only `'v4r2'` is implemented; other values are reserved for future releases.
+ * - `'v3r2'` — WalletV3R2 (legacy, still widely supported)
+ * - `'v4r2'` — WalletV4R2 (default)
+ * - `'v5r1'` — WalletV5R1 / W5 (mainnet wallet id, subwallet 0)
  */
-export type WalletVersion = 'v4r2';
+export type WalletVersion = 'v3r2' | 'v4r2' | 'v5r1';
 
 /**
  * Options accepted by the `TonWalletFinder` constructor.
@@ -67,7 +69,7 @@ export interface FindOptions {
 }
 
 /**
- * Searches for a TON WalletV4 address that ends with the given pattern.
+ * Searches for a TON wallet address (WalletV4R2 by default) that ends with the given pattern.
  *
  * @example
  * ```js
@@ -123,8 +125,8 @@ export declare class TonWalletFinder {
     createKeyPair(): Promise<{ keyPair: { publicKey: Uint8Array; secretKey: Uint8Array }; words: string[] }>;
 
     /**
-     * Derives the WalletV4 (workchain 0) address for a key pair and returns an
-     * address object. `toString()` always yields the bounceable, URL-safe form;
+     * Derives the address (workchain 0, contract version = `walletVersion`) for a key
+     * pair and returns an address object. `toString()` always yields the bounceable, URL-safe form;
      * the options argument is accepted for compatibility and ignored.
      * Synchronous — no I/O is performed.
      */
@@ -186,8 +188,14 @@ export declare const _internals: {
     mnemonicToPrivateKey(words: readonly string[]): Promise<Ed25519KeyPair>;
     /** TON "basic seed" check — `true` if the mnemonic is valid without a password. */
     isBasicSeed(words: readonly string[]): Promise<boolean>;
+    /** Bounceable, URL-safe address for a 32-byte public key and the given wallet version. */
+    walletAddress(version: WalletVersion, publicKey: Uint8Array, workchain?: number): string;
+    /** Bounceable, URL-safe WalletV3R2 address for a 32-byte public key. */
+    walletV3R2Address(publicKey: Uint8Array, workchain?: number): string;
     /** Bounceable, URL-safe WalletV4R2 address for a 32-byte public key. */
     walletV4Address(publicKey: Uint8Array, workchain?: number): string;
+    /** Bounceable, URL-safe WalletV5R1 (W5, mainnet wallet id) address for a 32-byte public key. */
+    walletV5R1Address(publicKey: Uint8Array, workchain?: number): string;
     /** TVM representation hash (SHA-256) of an ordinary cell. */
     cellHash(bitsCount: number, bitsBytes: Uint8Array, refs: ReadonlyArray<{ depth: number; hash: Uint8Array }>): Uint8Array;
     /** TVM bit padding: sets the completion bit after `bitsCount` data bits. */

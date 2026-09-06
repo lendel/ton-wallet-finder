@@ -105,10 +105,10 @@ describe('findWalletWithEnding({ workers })', () => {
 
         afterEach(() => sinon.restore());
 
-        it('should spawn exactly `workers` workers with targetEnding and showProcess', async () => {
+        it('should spawn exactly `workers` workers with targetEnding, showProcess and walletVersion', async () => {
             const p = finder.findWalletWithEnding({ workers: 3 });
             expect(spawned).to.have.lengthOf(3);
-            expect(spawned[0].workerData).to.deep.equal({ targetEnding: 'A', showProcess: false });
+            expect(spawned[0].workerData).to.deep.equal({ targetEnding: 'A', showProcess: false, walletVersion: 'v4r2' });
             spawned[1].emit('message', {
                 type: 'found', publicKey: Buffer.alloc(32, 1), secretKey: Buffer.alloc(64, 2),
                 words: Array(24).fill('abandon'), address: 'EQ' + 'A'.repeat(46),
@@ -239,6 +239,15 @@ describe('findWalletWithEnding({ workers })', () => {
             const finder = new TonWalletFinder('A');
             const result = await finder.findWalletWithEnding({ workers: 'auto' });
             expect(result.walletAddress.endsWith('A')).to.equal(true);
+        });
+
+        it('should pass walletVersion through to the workers (v5r1 result re-derives on the main thread)', async function () {
+            this.timeout(60000);
+            const finder = new TonWalletFinder('A', { walletVersion: 'v5r1' });
+            const result = await finder.findWalletWithEnding({ workers: 2 });
+            expect(result.walletAddress.endsWith('A')).to.equal(true);
+            const { walletV5R1Address } = require('../index')._internals;
+            expect(walletV5R1Address(Buffer.from(result.publicKey, 'hex'))).to.equal(result.walletAddress);
         });
     });
 });

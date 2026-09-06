@@ -11,6 +11,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [5.1.0] — 2026-09-06
+
+### Added
+- **Wallet version selection.** `walletVersion` now accepts `'v3r2'` and `'v5r1'` in addition
+  to `'v4r2'` (still the default, so existing callers get exactly the same addresses as before).
+  Different versions derive different addresses from the same mnemonic — pick the one matching
+  the wallet software the mnemonic will be imported into.
+  - `'v3r2'`: WalletV3R2 — data cell `seqno | subwallet_id | pubkey` (320 bits).
+  - `'v5r1'`: WalletV5R1 (W5) — data cell `is_signature_allowed | seqno | wallet_id | pubkey |
+    extensions` (322 bits); `wallet_id` is the mainnet client context (workchain 0, subwallet 0)
+    XOR'ed with the network global id `-239`, as in `@ton/ton`.
+- Worker threads receive `walletVersion` and derive the same address as the main thread.
+- `_internals.walletAddress(version, publicKey)`, `_internals.walletV3R2Address`,
+  `_internals.walletV5R1Address`.
+- `test/crypto.test.js`: reference addresses for V3R2 and V5R1 for the existing reference
+  mnemonic, produced with `@ton/ton` 16.3 (`WalletContractV3R2` / `WalletContractV5R1`,
+  installed in a scratch directory — still not a project dependency). The code-cell hash and
+  depth constants come from the same run.
+
+### Changed
+- `index.d.ts`: `WalletVersion` is `'v3r2' | 'v4r2' | 'v5r1'`.
+- Address derivation refactored around a shared `StateInit` hashing helper; `walletV4Address`
+  behaviour is unchanged (same reference vector).
+
+---
+
 ## [5.0.0] — 2026-09-06
 
 ### Breaking Changes

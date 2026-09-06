@@ -3,9 +3,15 @@
 const { expect } = require('chai');
 const { _internals } = require('../index');
 
-const { mnemonicToPrivateKey, isBasicSeed, walletV4Address, cellHash, padBits, crc16 } = _internals;
+const {
+    mnemonicToPrivateKey, isBasicSeed,
+    walletAddress, walletV3R2Address, walletV4Address, walletV5R1Address,
+    cellHash, padBits, crc16,
+} = _internals;
 
-// Reference vector generated with @ton/crypto 3.3 + @ton/ton 16.2 (WalletContractV4, workchain 0).
+// Reference vector generated with @ton/crypto 3.3 + @ton/ton 16.x (workchain 0):
+// WalletContractV4 for `address` (16.2), WalletContractV3R2 / WalletContractV5R1
+// for `addressV3R2` / `addressV5R1` (16.3, default mainnet wallet id).
 // Any change to the mnemonic derivation, cell hashing, padding, CRC or address
 // encoding must keep this test green — otherwise generated addresses would no
 // longer belong to the generated mnemonic.
@@ -13,6 +19,8 @@ const VECTOR = {
     words: 'tip sadness bid sleep want jaguar upset just crack kid possible heart exclude figure sadness alter feel expect wide have column seek win churn'.split(' '),
     publicKey: 'f46e86acef393f1546d1f68b2bb090e1a2ed4f3edc112e1e87726364363ad355',
     address: 'EQCPi7yyyv6aDR8jY38B_PH9wSaMc8NTNEAGgQlnHW_BP3KC',
+    addressV3R2: 'EQBFytd2exhHu6RoGzTRcMQknLVp_9yLt1tqYNFZ_W0JvCma',
+    addressV5R1: 'EQBeV0gSMYJ-nN8fj5DGGfJ-AbseVanoTAq0JgiutlBXsS3c',
 };
 
 describe('crypto primitives (reference vectors)', () => {
@@ -78,6 +86,57 @@ describe('crypto primitives (reference vectors)', () => {
             const raw  = Buffer.from(addr.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
             expect(raw[0]).to.equal(0x11);
             expect(raw.readInt8(1)).to.equal(-1);
+        });
+    });
+
+    describe('walletV3R2Address()', () => {
+        it('should produce the reference address from the reference public key', () => {
+            const addr = walletV3R2Address(Buffer.from(VECTOR.publicKey, 'hex'));
+            expect(addr).to.equal(VECTOR.addressV3R2);
+        });
+
+        it('should accept a plain Uint8Array public key (not only Buffer)', () => {
+            const plain = new Uint8Array(Buffer.from(VECTOR.publicKey, 'hex'));
+            expect(walletV3R2Address(plain)).to.equal(VECTOR.addressV3R2);
+        });
+
+        it('should produce a 48-char base64url string with no padding', () => {
+            expect(walletV3R2Address(Buffer.alloc(32, 7))).to.match(/^[A-Za-z0-9_-]{48}$/);
+        });
+    });
+
+    describe('walletV5R1Address()', () => {
+        it('should produce the reference address from the reference public key', () => {
+            const addr = walletV5R1Address(Buffer.from(VECTOR.publicKey, 'hex'));
+            expect(addr).to.equal(VECTOR.addressV5R1);
+        });
+
+        it('should accept a plain Uint8Array public key (not only Buffer)', () => {
+            const plain = new Uint8Array(Buffer.from(VECTOR.publicKey, 'hex'));
+            expect(walletV5R1Address(plain)).to.equal(VECTOR.addressV5R1);
+        });
+
+        it('should produce a 48-char base64url string with no padding', () => {
+            expect(walletV5R1Address(Buffer.alloc(32, 7))).to.match(/^[A-Za-z0-9_-]{48}$/);
+        });
+    });
+
+    describe('walletAddress()', () => {
+        const pubkey = Buffer.from(VECTOR.publicKey, 'hex');
+
+        it('should dispatch to the per-version derivation', () => {
+            expect(walletAddress('v3r2', pubkey)).to.equal(VECTOR.addressV3R2);
+            expect(walletAddress('v4r2', pubkey)).to.equal(VECTOR.address);
+            expect(walletAddress('v5r1', pubkey)).to.equal(VECTOR.addressV5R1);
+        });
+
+        it('should give three different addresses for the same key', () => {
+            const all = new Set([VECTOR.addressV3R2, VECTOR.address, VECTOR.addressV5R1]);
+            expect(all.size).to.equal(3);
+        });
+
+        it('should throw on an unknown version', () => {
+            expect(() => walletAddress('v2r2', pubkey)).to.throw(Error, /Unsupported wallet version/);
         });
     });
 
