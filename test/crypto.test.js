@@ -42,8 +42,8 @@ describe('crypto primitives (reference vectors)', () => {
 
         it('should not expose other internal files as subpaths', () => {
             let err;
-            try { require('ton-wallet-finder/wordlist.js'); } catch (e) { err = e; }
-            expect(err, 'wordlist.js must not be reachable as a subpath').to.be.instanceOf(Error);
+            try { require('ton-wallet-finder/lib/wordlist.js'); } catch (e) { err = e; }
+            expect(err, 'lib/wordlist.js must not be reachable as a subpath').to.be.instanceOf(Error);
             expect(err.code).to.equal('ERR_PACKAGE_PATH_NOT_EXPORTED');
         });
     });

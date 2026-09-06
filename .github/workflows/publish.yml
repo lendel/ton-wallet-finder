@@ -33,7 +33,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run coverage
       - run: npm audit --audit-level=high --omit=dev
 
   publish:
@@ -69,3 +69,16 @@ jobs:
       - name: Publish
         # No NODE_AUTH_TOKEN on purpose: npm authenticates through the OIDC token.
         run: npm publish --provenance --access public
+
+      # Software bill of materials for the published tree (production deps only —
+      # for this package that is the package itself). Kept with the run that
+      # published, next to the provenance npm generates.
+      - name: Generate SBOM (CycloneDX)
+        run: npm sbom --sbom-format cyclonedx --omit dev > sbom.cdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-${{ github.ref_name }}
+          path: sbom.cdx.json
+          retention-days: 90

@@ -22,12 +22,34 @@ Node.js 22 or 24 (LTS) — `.nvmrc` pins 22 for `nvm use`; CI runs the suite on 
 
 | Command | Description |
 |---------|-------------|
-| `npm run check` | Everything CI runs: lint + typecheck + tests |
-| `npm test` | Run the full test suite (Mocha, configured by `.mocharc.json`) |
+| `npm run check` | Everything CI runs: lint + typecheck + tests with coverage thresholds |
+| `npm test` | Run the test suite (Mocha, configured by `.mocharc.json`) |
+| `npm run coverage` | Same suite under c8; fails below the thresholds in `.c8rc.json` (95% lines/statements, 90% branches, 100% functions) |
 | `npm run lint` | Run ESLint over the whole repository |
 | `npm run typecheck` | Compile `index.d.ts` and `test/types.test-d.ts` with `tsc --noEmit` |
 
-Run `npm run check` before opening a PR — CI runs the same three steps.
+Run `npm run check` before opening a PR — CI runs the same steps.
+
+---
+
+## Code map
+
+The package is deliberately small. Each file has one job:
+
+| File | Job |
+|------|-----|
+| `index.js` | The public surface: `TonWalletFinder` (option validation, main-thread search, worker pool orchestration, result formatting) and the `_internals` re-export. Nothing cryptographic lives here. |
+| `worker.js` | Worker-thread entry point. Runs the shared search loop and posts `trying` / `found` / `error` messages to the main thread. |
+| `lib/mnemonic.js` | TON mnemonic generation and mnemonic → Ed25519 key pair (HMAC-SHA-512 → PBKDF2-SHA-512 → Ed25519 via Node's built-in `crypto`). |
+| `lib/address.js` | Public key → address: TVM cell hashing (`padBits`, `cellHash`), CRC-16/XMODEM, the per-version data-cell layouts and the pre-computed code-cell constants. Pure functions, no I/O. |
+| `lib/search.js` | The generate-and-check loop shared by the main thread and workers: retry policy, progress callback, cancellation. Callers inject `generate()`, so the loop is unit-tested with stubs. |
+| `lib/save-results.js` | `saveResultsToFile()`: exclusive-create write with numeric-suffix fallback. |
+| `lib/wordlist.js` | The 2048-word BIP-39 English list, frozen, one word per line; its SHA-256 is pinned in `test/wordlist.test.js`. |
+| `index.d.ts` | Hand-written TypeScript declarations for the public surface (see *Type-declaration test*). |
+
+Dependency direction is strictly downward: `index.js` / `worker.js` → `lib/*` → Node built-ins.
+`lib/` modules never require `index.js` or each other's callers, and `lib/wordlist.js` is
+required only by `lib/mnemonic.js`.
 
 ---
 
@@ -54,6 +76,9 @@ Tests live in `test/` (Mocha + Chai + Sinon):
 | `TonWalletFinder.test.js` | Constructor validation, single-threaded search, cancellation, `saveResultsToFile` |
 | `workers.test.js` | Worker-thread pool (deterministic fake workers + real-thread integration) |
 | `crypto.test.js` | Reference vectors for mnemonic → key → address, `cellHash`, `padBits`, `crc16` |
+| `search.test.js` | `lib/search.js` in isolation: retry policy, give-up, counter reset, `onTrying`, cancellation, `abortErrorFrom` |
+| `invariants.test.js` | Property-style checks over hundreds of random keys: address length/alphabet/prefix/CRC, no collisions, three versions differ, `padBits` / `cellHash` / `crc16` invariants (with an independent CRC implementation), mnemonic normalisation |
+| `wordlist.test.js` | `lib/wordlist.js` is the canonical BIP-39 list (SHA-256 pinned), sorted, unique, frozen |
 | `esm.test.mjs` | Package is importable from ES modules through the `exports` map |
 | `types.test-d.ts` | Compile-time assertions on `index.d.ts` (not run by Mocha — see below) |
 
@@ -103,7 +128,7 @@ together.**
 
 1. Fork the repository and create a feature branch
 2. Write tests for your changes
-3. Ensure `npm run check` passes (lint + typecheck + tests)
+3. Ensure `npm run check` passes (lint + typecheck + tests with coverage thresholds)
 4. Update `index.d.ts` and `test/types.test-d.ts` if the public API changed
 5. Update `CHANGELOG.md` under `[Unreleased]`
 6. Open a PR against `master`
@@ -136,7 +161,8 @@ Releases are published by CI only (`.github/workflows/publish.yml`), never from 
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
 3. The workflow checks that the tag matches `package.json`, runs lint + typecheck +
-   tests + `npm audit` on Node.js 24, then `npm publish --provenance`.
+   tests + `npm audit` on Node.js 24, then `npm publish --provenance` and attaches a
+   CycloneDX SBOM to the workflow run.
 
 ### Authentication: npm trusted publishing (OIDC)
 

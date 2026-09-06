@@ -249,5 +249,50 @@ describe('findWalletWithEnding({ workers })', () => {
             const { walletV5R1Address } = require('../index')._internals;
             expect(walletV5R1Address(Buffer.from(result.publicKey, 'hex'))).to.equal(result.walletAddress);
         });
+
+        it('should stream progress messages when showProcess is true', async function () {
+            this.timeout(60000);
+            // An impossible target keeps the worker searching; the first 'trying'
+            // message proves the progress path is wired through parentPort.
+            const { Worker } = require('worker_threads');
+            const path = require('path');
+            const worker = new Worker(path.join(__dirname, '..', 'worker.js'), {
+                workerData: { targetEnding: 'A'.repeat(46), showProcess: true, walletVersion: 'v4r2' },
+            });
+            try {
+                const msg = await new Promise((resolve, reject) => {
+                    worker.once('message', resolve);
+                    worker.once('error', reject);
+                });
+                expect(msg.type).to.equal('trying');
+                expect(msg.address).to.be.a('string').with.lengthOf(48);
+            } finally {
+                await worker.terminate();
+            }
+        });
+
+        it('should report a persistent generation failure as an error message instead of crashing', async function () {
+            this.timeout(60000);
+            // TonWalletFinder validates walletVersion, so drive worker.js directly with a
+            // version it cannot derive: every attempt throws, the shared retry policy gives
+            // up, and the worker must post { type: 'error' } rather than die or spin.
+            const { Worker } = require('worker_threads');
+            const path = require('path');
+            const worker = new Worker(path.join(__dirname, '..', 'worker.js'), {
+                workerData: { targetEnding: 'A', showProcess: false, walletVersion: 'v0' },
+            });
+            try {
+                const msg = await new Promise((resolve, reject) => {
+                    worker.once('message', resolve);
+                    worker.once('error', reject);
+                    worker.once('exit', code => reject(new Error(`worker exited with ${code} before posting`)));
+                });
+                expect(msg.type).to.equal('error');
+                expect(msg.message).to.include('giving up');
+                expect(msg.message).to.include('Unsupported wallet version');
+            } finally {
+                await worker.terminate();
+            }
+        });
     });
 });

@@ -19,7 +19,7 @@ Find a wallet whose address ends with any string you choose.
 
 ---
 
-**Security: 0 dependencies, 0 network calls.** The only modules imported are Node.js built-ins (`crypto`, `fs`, `os`, `path`, `worker_threads`) — verify with `grep require index.js worker.js`. Every npm release is published from CI with a provenance attestation.
+**Security: 0 dependencies, 0 network calls.** The only modules imported are Node.js built-ins (`crypto`, `fs`, `os`, `path`, `worker_threads`) — verify with `grep -rn "require(" index.js worker.js lib/`. Every npm release is published from CI with a provenance attestation.
 
 ---
 

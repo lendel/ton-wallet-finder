@@ -9,11 +9,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Tooling, CI and repository standards only. No public API and no runtime behaviour
-changed: the only edit to a shipped source file is the module-private rename noted
-under *Changed*, which the existing 103 tests cover unchanged.
+Tooling, CI, tests and internal structure only. **No public API and no runtime
+behaviour changed.** Every address the library derives is byte-identical to 5.1.1 —
+the reference vectors in `test/crypto.test.js` and all 103 pre-existing tests pass
+unchanged, and 52 new tests were added on top.
 
-### Added
+### Changed — internal structure
+- **`index.js` split into single-purpose modules under `lib/`.** The 627-line file
+  mixed Ed25519/mnemonic derivation, TVM cell hashing, the search loop, worker
+  orchestration and file output. It is now:
+  - `lib/mnemonic.js` — mnemonic generation and mnemonic → key pair
+  - `lib/address.js` — key → address (cell hashing, CRC, per-version data cells, constants)
+  - `lib/search.js` — the generate-and-check loop with retry policy and cancellation
+  - `lib/save-results.js` — `saveResultsToFile()`
+  - `lib/wordlist.js` — the BIP-39 list, now frozen and one word per line (was a single
+    17 KB line at the repository root)
+  - `index.js` — `TonWalletFinder` and the exports only, ~250 lines
+  `index.d.ts`, `module.exports` and `_internals` are unchanged, so nothing a consumer
+  can observe moved. A "Code map" in CONTRIBUTING.md describes the layout.
+- **The search loop is no longer duplicated.** The main thread (`index.js`) and the
+  worker (`worker.js`) each carried their own copy of the same retry/give-up/progress
+  loop, with a comment asking them to be kept in sync. Both now call
+  `lib/search.js#findMatch()` and inject a `generate()` callback; the retry policy
+  (`MAX_CONSECUTIVE_ERRORS`) exists in exactly one place. `worker.js` no longer loads
+  all of `index.js` to reach three functions, and no longer exports anything.
+- `TonWalletFinder.findWalletWithEnding()` is now a short dispatcher between
+  `_searchOnMainThread()` and `_searchWithWorkers()`; the `do…while` with a `found`
+  flag and `continue`-in-`catch` is gone.
+- `address.toString('base64url')` replaces the manual `base64` + two `replace()` calls;
+  `writeUInt16BE()` replaces hand-rolled byte splitting for ref depths and the CRC.
+  Same bytes, verified by the reference vectors.
+- Module-private `walletAddress()` was briefly renamed `deriveWalletAddress()` to
+  satisfy `no-shadow`; after the split it lives in `lib/address.js` under its original
+  name and the class refers to it as `address.walletAddress`.
+
+### Added — tests (103 → 155)
+- `test/search.test.js` — `lib/search.js` in isolation with stubbed generators: first
+  match wins, `onTrying` sees every candidate, transient errors retry through `onRetry`,
+  give-up after 5 with `cause`, counter reset, already-aborted and mid-search abort,
+  and every branch of `abortErrorFrom()`.
+- `test/invariants.test.js` — property-style checks over 300 random keys per wallet
+  version: 48 base64url characters, `EQ` prefix, valid CRC-16 (including the
+  "appending the CRC gives zero" property), determinism, no collisions, three versions
+  pairwise distinct, single-bit key changes change the address, workchain −1 → `Ef`;
+  `padBits` completion-bit rules for every bit count 1–96; `cellHash` sensitivity to
+  data, ref hash, ref depth and bit count; `crc16` cross-checked against an independent
+  table-driven implementation; mnemonic normalisation (case/whitespace) and
+  `secretKey = seed ‖ publicKey`.
+- `test/wordlist.test.js` — pins the SHA-256 of `lib/wordlist.js` to the canonical
+  BIP-39 `english.txt` digest (`2f5eed53…`), and checks it is sorted, unique and frozen.
+- Two real-worker-thread tests that were missing: a persistent generation failure
+  is reported as `{ type: 'error' }` (the worker's retry path had no coverage), and
+  `showProcess` streams `{ type: 'trying' }` messages.
+- **Coverage is now measured and enforced.** `npm run coverage` runs the suite under
+  `c8` with thresholds in `.c8rc.json` (95% lines/statements, 90% branches, 100%
+  functions); CI runs this instead of the bare test step. Current: 99% lines, 96%
+  branches, 100% functions. `c8` is the one new dev dependency in this batch.
+
+### Added — repository
+- `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1).
+- `publish.yml` generates a CycloneDX SBOM with `npm sbom` and attaches it to the
+  publishing run next to npm's provenance.
+- `files` in `package.json` now lists `lib/`; the *Package contents* CI job installs the
+  packed tarball and runs a real two-worker search from it, so a missing `lib/` can
+  never reach npm.
+
+### Added — tooling (earlier in this release cycle)
 - **Type-declaration tests.** `test/types.test-d.ts` asserts the whole public type surface
   of the hand-written `index.d.ts` (`expectType<T>()` + `@ts-expect-error`), importing the
   package by name so the `types` entries in the `exports` map resolve as a consumer's
