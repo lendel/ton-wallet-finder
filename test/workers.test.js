@@ -50,6 +50,44 @@ describe('findWalletWithEnding({ workers })', () => {
         });
     });
 
+    describe('constructor default', () => {
+        it('should use the constructor workers option when no per-call override is given', async () => {
+            const finder = new TonWalletFinder('A', { workers: 3 });
+            const spawned = [];
+            sinon.stub(finder, '_createWorker').callsFake(workerData => {
+                const w = fakeWorker();
+                w.workerData = workerData;
+                spawned.push(w);
+                return w;
+            });
+            try {
+                const p = finder.findWalletWithEnding();
+                expect(spawned).to.have.lengthOf(3);
+                spawned[0].emit('message', {
+                    type: 'found', publicKey: new Uint8Array(32), secretKey: new Uint8Array(64),
+                    words: [], address: 'EQA',
+                });
+                await p;
+            } finally {
+                sinon.restore();
+            }
+        });
+
+        it('should let a per-call workers option override the constructor default', async () => {
+            const finder = new TonWalletFinder('A', { workers: 3 });
+            const spawn = sinon.stub(finder, '_createWorker');
+            sinon.stub(finder, 'createKeyPair')
+                .resolves({ keyPair: { publicKey: Buffer.alloc(32), secretKey: Buffer.alloc(64) }, words: Array(24).fill('abandon') });
+            sinon.stub(finder, 'createWallet').returns({ toString: () => 'EQ' + 'A'.repeat(46) });
+            try {
+                await finder.findWalletWithEnding({ workers: 1 });
+                expect(spawn.callCount).to.equal(0);
+            } finally {
+                sinon.restore();
+            }
+        });
+    });
+
     describe('with fake workers (deterministic)', () => {
         let finder;
         let spawned;

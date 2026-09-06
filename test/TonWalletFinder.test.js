@@ -61,6 +61,56 @@ describe('TonWalletFinder', () => {
             const finder = new TonWalletFinder('x');
             expect(finder.saveResult).to.equal(false);
         });
+
+        it('should default workers to 1', () => {
+            const finder = new TonWalletFinder('x');
+            expect(finder.workers).to.equal(1);
+        });
+
+        it('should default walletVersion to v4r2', () => {
+            const finder = new TonWalletFinder('x');
+            expect(finder.walletVersion).to.equal('v4r2');
+        });
+
+        it('should accept an options object and expose the values as instance properties', () => {
+            const finder = new TonWalletFinder('x', {
+                showProcess: true,
+                showResult: true,
+                saveResult: true,
+                workers: 4,
+                walletVersion: 'v4r2',
+            });
+            expect(finder.showProcess).to.equal(true);
+            expect(finder.showResult).to.equal(true);
+            expect(finder.saveResult).to.equal(true);
+            expect(finder.workers).to.equal(4);
+            expect(finder.walletVersion).to.equal('v4r2');
+        });
+
+        it('should work correctly when null is passed as options', () => {
+            expect(() => new TonWalletFinder('x', null)).not.to.throw();
+            const finder = new TonWalletFinder('x', null);
+            expect(finder.showProcess).to.equal(false);
+            expect(finder.workers).to.equal(1);
+            expect(finder.walletVersion).to.equal('v4r2');
+        });
+
+        it('should throw a RangeError on an invalid workers option', () => {
+            expect(() => new TonWalletFinder('x', { workers: 0 })).to.throw(RangeError);
+            expect(() => new TonWalletFinder('x', { workers: -1 })).to.throw(RangeError);
+            expect(() => new TonWalletFinder('x', { workers: 1.5 })).to.throw(RangeError);
+        });
+
+        it("should accept workers: 'auto' without resolving it at construction time", () => {
+            const finder = new TonWalletFinder('x', { workers: 'auto' });
+            expect(finder.workers).to.equal('auto');
+        });
+
+        it('should throw on an unsupported walletVersion', () => {
+            expect(() => new TonWalletFinder('x', { walletVersion: 'v3r2' })).to.throw(Error, /walletVersion/);
+            expect(() => new TonWalletFinder('x', { walletVersion: 'v5r1' })).to.throw(Error, /walletVersion/);
+            expect(() => new TonWalletFinder('x', { walletVersion: 'bogus' })).to.throw(Error, /walletVersion/);
+        });
     });
 
     // -------------------------------------------------------------------------
@@ -125,7 +175,7 @@ describe('TonWalletFinder', () => {
             // Single character: ~1/64 chance per attempt → fast in practice
             this.timeout(60000);
             const target = 'A';
-            const finder = new TonWalletFinder(target, false, false, false);
+            const finder = new TonWalletFinder(target);
             const result = await finder.findWalletWithEnding();
             expect(result).to.have.all.keys('publicKey', 'privateKey', 'words', 'walletAddress');
             expect(result.walletAddress).to.be.a('string');
@@ -138,7 +188,7 @@ describe('TonWalletFinder', () => {
         // null argument must not throw TypeError
         it('should work correctly when null is passed as options', async function () {
             this.timeout(60000);
-            const finder = new TonWalletFinder('A', false, false, false);
+            const finder = new TonWalletFinder('A');
             let result;
             try {
                 result = await finder.findWalletWithEnding(null);
@@ -150,7 +200,7 @@ describe('TonWalletFinder', () => {
 
         it('should produce no console.log output when showResult and showProcess are both false', async function () {
             this.timeout(60000);
-            const finder = new TonWalletFinder('A', false, false, false);
+            const finder = new TonWalletFinder('A');
 
             // Stub crypto helpers so the test is deterministic and doesn't hang when
             // console.log is replaced (some WASM-backed crypto libs bind console.log
@@ -177,7 +227,7 @@ describe('TonWalletFinder', () => {
             this.timeout(60000);
             const writeFileStub = sinon.stub(fs.promises, 'writeFile').resolves();
             try {
-                const finder = new TonWalletFinder('A', false, false, true);
+                const finder = new TonWalletFinder('A', { saveResult: true });
                 await finder.findWalletWithEnding();
                 expect(writeFileStub.calledOnce).to.equal(true);
                 const writtenData = writeFileStub.firstCall.args[1];
@@ -193,7 +243,7 @@ describe('TonWalletFinder', () => {
         // AbortSignal cancellation
         it('should reject with an Error when AbortSignal is triggered', async function () {
             this.timeout(5000);
-            const finder = new TonWalletFinder('AAAAAAAAAA', false, false, false);
+            const finder = new TonWalletFinder('AAAAAAAAAA');
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort('Search cancelled by test'), 100);
             let caughtError;
@@ -215,7 +265,7 @@ describe('TonWalletFinder', () => {
             const controller = new AbortController();
             const reason = new Error('timeout hit');
             controller.abort(reason);
-            const finder = new TonWalletFinder('A', false, false, false);
+            const finder = new TonWalletFinder('A');
             let caughtError;
             try {
                 await finder.findWalletWithEnding({ signal: controller.signal });
@@ -231,7 +281,7 @@ describe('TonWalletFinder', () => {
             this.timeout(5000);
             const controller = new AbortController();
             controller.abort('Pre-aborted');
-            const finder = new TonWalletFinder('A', false, false, false);
+            const finder = new TonWalletFinder('A');
             let caughtError;
             try {
                 await finder.findWalletWithEnding({ signal: controller.signal });
@@ -247,7 +297,7 @@ describe('TonWalletFinder', () => {
             this.timeout(60000);
             const logStub = sinon.stub(console, 'log');
             try {
-                const finder = new TonWalletFinder('A', true, false, false);
+                const finder = new TonWalletFinder('A', { showProcess: true });
                 await finder.findWalletWithEnding();
                 const tryingCalls = logStub.getCalls().filter(c => c.args[0] === 'Trying address:');
                 expect(tryingCalls.length).to.be.at.least(1);
@@ -259,7 +309,7 @@ describe('TonWalletFinder', () => {
         // Error path: createKeyPair throws on first call, should recover and continue
         it('should continue searching after a transient key generation error', async function () {
             this.timeout(60000);
-            const finder = new TonWalletFinder('A', false, false, false);
+            const finder = new TonWalletFinder('A');
             let callCount = 0;
             const original = finder.createKeyPair.bind(finder);
             const stub = sinon.stub(finder, 'createKeyPair').callsFake(async () => {
@@ -280,7 +330,7 @@ describe('TonWalletFinder', () => {
         // Persistent error: must NOT spin forever
         it('should reject after repeated consecutive key generation errors', async function () {
             this.timeout(5000);
-            const finder = new TonWalletFinder('A', false, false, false);
+            const finder = new TonWalletFinder('A');
             const boom = new Error('crypto unavailable');
             const stub = sinon.stub(finder, 'createKeyPair').rejects(boom);
             const errorStub = sinon.stub(console, 'error');
@@ -301,7 +351,7 @@ describe('TonWalletFinder', () => {
 
         it('should reset the consecutive error counter after a successful attempt', async function () {
             this.timeout(5000);
-            const finder = new TonWalletFinder('A', false, false, false);
+            const finder = new TonWalletFinder('A');
             const fakeKeyPair = { publicKey: Buffer.alloc(32), secretKey: Buffer.alloc(64) };
             let call = 0;
             // Pattern: 4 errors, 1 success (no match), 4 errors, 1 success (match).
