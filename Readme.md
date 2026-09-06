@@ -30,7 +30,9 @@ Find a wallet whose address ends with any string you choose.
 - [Options](#options)
 - [API](#api)
 - [Performance](#performance)
+- [What's new in v5](#-whats-new-in-v5)
 - [What's new in v4](#-whats-new-in-v4)
+- [Migration from v4](#-migration-from-v4)
 - [Migration from v2/v3](#-migration-from-v2v3)
 - [Support the Author](#-support-the-author)
 - [License](#license)
@@ -81,12 +83,24 @@ node findWallet.js
 
 ## Options
 
+```javascript
+new TonWalletFinder(targetEnding, {
+  showProcess,   // boolean
+  showResult,    // boolean
+  saveResult,    // boolean
+  workers,       // number | 'auto'
+  walletVersion, // 'v4r2'
+});
+```
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `targetEnding` | `string` | required | Desired address ending. Latin letters, digits, `-`, `_`, at most 46 characters. **Case-sensitive.** |
-| `showProcess` | `boolean` | `false` | Log each attempted address to console |
-| `showResult` | `boolean` | `false` | Log found wallet details to console. **Keep `false` in shared/logged environments to avoid exposing private keys.** |
-| `saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` in the current working directory. Never overwrites: an existing file gets a `-2`, `-3`, … suffix |
+| `options.showProcess` | `boolean` | `false` | Log each attempted address to console |
+| `options.showResult` | `boolean` | `false` | Log found wallet details to console. **Keep `false` in shared/logged environments to avoid exposing private keys.** |
+| `options.saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` in the current working directory. Never overwrites: an existing file gets a `-2`, `-3`, … suffix |
+| `options.workers` | `number \| 'auto'` | `1` | Default worker-thread count for `findWalletWithEnding()` (see [Performance](#performance)). Overridable per call. |
+| `options.walletVersion` | `'v4r2'` | `'v4r2'` | TON wallet contract version to derive the address for. Only `'v4r2'` is supported today; different versions produce different addresses from the same mnemonic, so this must match whatever wallet software you'll import the mnemonic into. |
 
 ---
 
@@ -132,7 +146,9 @@ const result = await finder.findWalletWithEnding({ workers: 'auto' });
 const result = await finder.findWalletWithEnding({ workers: 4 });
 ```
 
-`workers` defaults to `1` (single-threaded, same behaviour as before). It can be combined with `signal`.
+`workers` defaults to whatever was passed to the constructor (itself `1` by default, i.e.
+single-threaded). Passing `workers` to `findWalletWithEnding()` overrides that default for this
+call only. It can be combined with `signal`.
 
 ### `saveResultsToFile(publicKey, privateKey, words, walletAddress, [fileName]) → Promise<string | undefined>`
 
@@ -179,6 +195,28 @@ count is geometrically distributed), so treat these as medians, not guarantees.
 
 ---
 
+## 🚀 What's new in v5
+
+Version 5.0.0 replaces the four positional constructor arguments with a single options
+object, and moves `workers` from a `findWalletWithEnding()`-only option to a constructor
+default (still overridable per call):
+
+```javascript
+// v4.x
+new TonWalletFinder('abc', false, true, false);
+
+// v5.0.0
+new TonWalletFinder('abc', { showResult: true });
+```
+
+It also adds a `walletVersion` option, reserved for upcoming `'v3r2'`/`'v5r1'` support.
+Today only `'v4r2'` (the existing default behaviour) is accepted — passing anything else
+throws at construction time.
+
+See [Migration from v4](#-migration-from-v4) below for the full breaking-change table.
+
+---
+
 ## 🚀 What's new in v4
 
 Version 4.0.0 completely eliminates all production dependencies.
@@ -196,6 +234,45 @@ Starting with v4, everything is implemented using **Node.js built-in modules onl
 
 **Result:** `npm install ton-wallet-finder` now installs **0 additional packages**.
 The public API is identical — no code changes required when upgrading from v3.
+
+---
+
+## 🔀 Migration from v4
+
+### v4 → v5.0.0 breaking changes
+
+| What changed | v4.x behaviour | v5.0.0 behaviour |
+|---|---|---|
+| Constructor signature | `TonWalletFinder(targetEnding, showProcess, showResult, saveResult)` | `TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers, walletVersion })` |
+| `workers` | `findWalletWithEnding({ workers })` only, default `1` | Also a constructor option (sets the default); `findWalletWithEnding({ workers })` still overrides it per call |
+| `walletVersion` | did not exist | New option, default `'v4r2'` (only supported value for now) |
+
+### Migration checklist
+
+1. **Constructor call** — move the three trailing booleans into an options object:
+   ```js
+   // v4.x
+   new TonWalletFinder('abc', true, true, false);
+   // v5.0.0
+   new TonWalletFinder('abc', { showProcess: true, showResult: true });
+   ```
+
+2. **`workers`** — if you always passed the same `workers` value to every
+   `findWalletWithEnding()` call, move it to the constructor instead:
+   ```js
+   // v4.x
+   const finder = new TonWalletFinder('abc');
+   await finder.findWalletWithEnding({ workers: 'auto' });
+   // v5.0.0
+   const finder = new TonWalletFinder('abc', { workers: 'auto' });
+   await finder.findWalletWithEnding();
+   ```
+   No change needed if you want to keep passing `workers` per call — it still works as a
+   per-call override.
+
+3. **`walletVersion`** — nothing to do; it defaults to `'v4r2'`, which is what v4.x always
+   produced. It exists now only so it can be validated; `'v3r2'`/`'v5r1'` are not implemented
+   yet.
 
 ---
 
@@ -303,12 +380,24 @@ import { TonWalletFinder } from 'ton-wallet-finder';
 
 ### Опции
 
+```javascript
+new TonWalletFinder(targetEnding, {
+  showProcess,   // boolean
+  showResult,    // boolean
+  saveResult,    // boolean
+  workers,       // number | 'auto'
+  walletVersion, // 'v4r2'
+});
+```
+
 | Параметр | Тип | По умолчанию | Описание |
 |----------|-----|--------------|----------|
 | `targetEnding` | `string` | обязательный | Желаемое окончание адреса. Латиница, цифры, `-`, `_`, не более 46 символов. **Регистрозависимо.** |
-| `showProcess` | `boolean` | `false` | Выводить каждый проверяемый адрес в консоль |
-| `showResult` | `boolean` | `false` | Вывести найденный кошелёк в консоль. **Оставьте `false` в окружениях с логированием, чтобы не раскрывать приватный ключ.** |
-| `saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` в текущей рабочей директории. Существующий файл не перезаписывается: добавляется суффикс `-2`, `-3`, … |
+| `options.showProcess` | `boolean` | `false` | Выводить каждый проверяемый адрес в консоль |
+| `options.showResult` | `boolean` | `false` | Вывести найденный кошелёк в консоль. **Оставьте `false` в окружениях с логированием, чтобы не раскрывать приватный ключ.** |
+| `options.saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` в текущей рабочей директории. Существующий файл не перезаписывается: добавляется суффикс `-2`, `-3`, … |
+| `options.workers` | `number \| 'auto'` | `1` | Значение по умолчанию для числа воркеров в `findWalletWithEnding()` (см. [Производительность](#производительность)). Можно переопределить при вызове. |
+| `options.walletVersion` | `'v4r2'` | `'v4r2'` | Версия контракта TON-кошелька для деривации адреса. Пока поддерживается только `'v4r2'`; разные версии дают разные адреса из одной и той же мнемоники, поэтому значение должно совпадать с тем кошельком, в который вы будете импортировать мнемонику. |
 
 ### API
 
@@ -352,7 +441,9 @@ const result = await finder.findWalletWithEnding({ workers: 'auto' });
 const result = await finder.findWalletWithEnding({ workers: 4 });
 ```
 
-По умолчанию `workers: 1` (один поток, прежнее поведение). Сочетается с `signal`.
+По умолчанию используется значение, переданное в конструктор (само по умолчанию — `1`,
+то есть один поток). `workers`, переданный в `findWalletWithEnding()`, переопределяет это
+значение только для данного вызова. Сочетается с `signal`.
 
 #### `saveResultsToFile(publicKey, privateKey, words, walletAddress, [fileName]) → Promise<string | undefined>`
 
@@ -393,6 +484,26 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 Оценка: `время ≈ 64ⁿ / (5 × ядра)` секунд. Разброс между запусками большой (число попыток
 распределено геометрически), поэтому это медианы, а не гарантии.
 
+### Что нового в v5
+
+В версии 5.0.0 четыре позиционных аргумента конструктора заменены единым объектом опций,
+а `workers` стал значением по умолчанию, задаваемым в конструкторе (по-прежнему можно
+переопределить при вызове):
+
+```javascript
+// v4.x
+new TonWalletFinder('abc', false, true, false);
+
+// v5.0.0
+new TonWalletFinder('abc', { showResult: true });
+```
+
+Также добавлена опция `walletVersion`, зарезервированная под будущую поддержку
+`'v3r2'`/`'v5r1'`. Пока принимается только `'v4r2'` (нынешнее поведение по умолчанию) —
+любое другое значение вызывает исключение при создании экземпляра.
+
+Полную таблицу breaking-изменений см. в разделе [Миграция с v4](#миграция-с-v4) ниже.
+
 ### Что нового в v4
 
 В версии 4.0.0 полностью отказались от избыточных внешних зависимостей.
@@ -410,6 +521,43 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 
 **Результат:** `npm install ton-wallet-finder` устанавливает **0 дополнительных пакетов**.
 Публичный API не изменился — при обновлении с v3 никаких правок в коде не требуется.
+
+### Миграция с v4
+
+#### Breaking-изменения v4 → v5.0.0
+
+| Что изменилось | Поведение v4.x | Поведение v5.0.0 |
+|---|---|---|
+| Сигнатура конструктора | `TonWalletFinder(targetEnding, showProcess, showResult, saveResult)` | `TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers, walletVersion })` |
+| `workers` | только в `findWalletWithEnding({ workers })`, по умолчанию `1` | Также опция конструктора (задаёт значение по умолчанию); `findWalletWithEnding({ workers })` по-прежнему переопределяет его для конкретного вызова |
+| `walletVersion` | не существовала | Новая опция, по умолчанию `'v4r2'` (пока единственное поддерживаемое значение) |
+
+#### Чек-лист миграции
+
+1. **Вызов конструктора** — перенесите три последних булевых аргумента в объект опций:
+   ```js
+   // v4.x
+   new TonWalletFinder('abc', true, true, false);
+   // v5.0.0
+   new TonWalletFinder('abc', { showProcess: true, showResult: true });
+   ```
+
+2. **`workers`** — если вы всегда передавали одно и то же значение `workers` в каждый
+   вызов `findWalletWithEnding()`, перенесите его в конструктор:
+   ```js
+   // v4.x
+   const finder = new TonWalletFinder('abc');
+   await finder.findWalletWithEnding({ workers: 'auto' });
+   // v5.0.0
+   const finder = new TonWalletFinder('abc', { workers: 'auto' });
+   await finder.findWalletWithEnding();
+   ```
+   Если вы хотите по-прежнему передавать `workers` при каждом вызове — ничего менять не
+   нужно, это по-прежнему работает как переопределение для конкретного вызова.
+
+3. **`walletVersion`** — ничего делать не нужно; по умолчанию `'v4r2'`, то есть ровно то,
+   что v4.x всегда и производила. Опция появилась сейчас только для того, чтобы её можно
+   было валидировать; `'v3r2'`/`'v5r1'` пока не реализованы.
 
 ### Миграция с v2/v3
 

@@ -209,15 +209,24 @@ const MAX_TARGET_LENGTH = 46;
 // Transient errors are retried; a persistent one must not spin forever.
 const MAX_CONSECUTIVE_ERRORS = 5;
 
+// Only wallet version implemented so far; validated eagerly so a typo fails at
+// construction time instead of producing an address for the wrong wallet.
+const SUPPORTED_WALLET_VERSIONS = ['v4r2'];
+
 class TonWalletFinder {
     /**
      * @param {string}  targetEnding  - Desired address ending (Latin letters, digits, `-`, `_`).
      *                                  The match is case-sensitive (base64url alphabet).
-     * @param {boolean} [showProcess=false] - Log each attempted address to console
-     * @param {boolean} [showResult=false]  - Log found wallet details to console
-     * @param {boolean} [saveResult=false]  - Save result to ton_wallet_results.txt
+     * @param {object}  [options={}]                 - Optional configuration.
+     * @param {boolean} [options.showProcess=false]  - Log each attempted address to console
+     * @param {boolean} [options.showResult=false]   - Log found wallet details to console
+     * @param {boolean} [options.saveResult=false]   - Save result to ton_wallet_results.txt
+     * @param {number|'auto'} [options.workers=1]    - Default worker count for `findWalletWithEnding()`;
+     *        overridable per call. See `findWalletWithEnding` for the accepted values.
+     * @param {'v4r2'} [options.walletVersion='v4r2'] - TON wallet contract version to derive
+     *        the address for. Currently only `'v4r2'` is supported.
      */
-    constructor(targetEnding, showProcess = false, showResult = false, saveResult = false) {
+    constructor(targetEnding, options = {}) {
         // Dash at end of character class avoids ambiguous range
         const validEndingRegex = /^[a-zA-Z0-9_-]+$/;
         if (!validEndingRegex.test(targetEnding)) {
@@ -227,10 +236,29 @@ class TonWalletFinder {
             throw new Error(`Invalid target ending. A TON address has only ${MAX_TARGET_LENGTH} matchable characters, so an ending of ${targetEnding.length} characters can never be found.`);
         }
 
-        this.targetEnding = targetEnding;
-        this.showProcess  = showProcess;
-        this.showResult   = showResult;
-        this.saveResult   = saveResult;
+        // Safe destructure — works correctly for both undefined and null
+        const {
+            showProcess = false,
+            showResult = false,
+            saveResult = false,
+            workers = 1,
+            walletVersion = 'v4r2',
+        } = options !== null ? options : {};
+
+        if (!SUPPORTED_WALLET_VERSIONS.includes(walletVersion)) {
+            throw new Error(`Invalid walletVersion: expected one of ${SUPPORTED_WALLET_VERSIONS.map(v => `'${v}'`).join(', ')}, got ${JSON.stringify(walletVersion)}.`);
+        }
+        // Validate eagerly so a bad default fails at construction, not on first search.
+        // 'auto' is deliberately not resolved here — resolveWorkerCount() re-evaluates it
+        // per search so a later change in available CPUs is picked up.
+        resolveWorkerCount(workers);
+
+        this.targetEnding  = targetEnding;
+        this.showProcess   = showProcess;
+        this.showResult    = showResult;
+        this.saveResult    = saveResult;
+        this.workers       = workers;
+        this.walletVersion = walletVersion;
     }
 
     // Generate a new 24-word mnemonic and derive an Ed25519 key pair from it
@@ -254,14 +282,14 @@ class TonWalletFinder {
      *
      * @param {object}      [options={}]     - Optional configuration.
      * @param {AbortSignal} [options.signal]  - Optional AbortSignal to cancel the search.
-     * @param {number|'auto'} [options.workers=1] - Number of worker threads to search in
-     *        parallel. `'auto'` uses every available CPU core. `1` (default) searches on the
-     *        main thread exactly as before.
+     * @param {number|'auto'} [options.workers=this.workers] - Number of worker threads to
+     *        search in parallel, overriding the constructor's `workers` option for this call
+     *        only. `'auto'` uses every available CPU core. `1` searches on the main thread.
      * @returns {Promise<{ publicKey: string, privateKey: string, words: string[], walletAddress: string }>}
      */
     async findWalletWithEnding(options = {}) {
         // Safe destructure — works correctly for both undefined and null
-        const { signal, workers = 1 } = options !== null ? options : {};
+        const { signal, workers = this.workers } = options !== null ? options : {};
 
         const workerCount = resolveWorkerCount(workers);
 

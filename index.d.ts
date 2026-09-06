@@ -13,6 +13,40 @@ export interface WalletResult {
 }
 
 /**
+ * TON wallet contract version to derive the address for.
+ * Currently only `'v4r2'` is implemented; other values are reserved for future releases.
+ */
+export type WalletVersion = 'v4r2';
+
+/**
+ * Options accepted by the `TonWalletFinder` constructor.
+ */
+export interface TonWalletFinderOptions {
+    /** Log each attempted address to console. Default: `false` */
+    readonly showProcess?: boolean;
+
+    /** Log the found wallet credentials to console. Default: `false` */
+    readonly showResult?: boolean;
+
+    /** Save the found wallet credentials to a text file. Default: `false` */
+    readonly saveResult?: boolean;
+
+    /**
+     * Default number of worker threads to search on in parallel, or `'auto'` for one per
+     * available CPU core. Default: `1` (single-threaded, on the main thread).
+     * Overridable per call via `findWalletWithEnding({ workers })`.
+     */
+    readonly workers?: number | 'auto';
+
+    /**
+     * TON wallet contract version to derive the address for. Default: `'v4r2'`.
+     * Different versions produce different addresses from the same mnemonic, so this
+     * must match whatever wallet software the mnemonic will actually be imported into.
+     */
+    readonly walletVersion?: WalletVersion;
+}
+
+/**
  * Options accepted by `findWalletWithEnding`.
  */
 export interface FindOptions {
@@ -26,7 +60,7 @@ export interface FindOptions {
 
     /**
      * Number of worker threads to search on in parallel, or `'auto'` for one per
-     * available CPU core. Default: `1` (single-threaded, on the main thread).
+     * available CPU core. Overrides the constructor's `workers` option for this call only.
      * Throughput scales almost linearly with the number of cores.
      */
     readonly workers?: number | 'auto';
@@ -64,21 +98,23 @@ export declare class TonWalletFinder {
     readonly showResult: boolean;
     /** Whether to save the found wallet credentials to a file */
     readonly saveResult: boolean;
+    /** Default worker count used by `findWalletWithEnding()` unless overridden per call */
+    readonly workers: number | 'auto';
+    /** TON wallet contract version addresses are derived for */
+    readonly walletVersion: WalletVersion;
 
     /**
      * @param targetEnding - Desired suffix for the wallet address.
      *   Only Latin letters [a-zA-Z], digits [0-9], dashes [-] and underscores [_] are allowed.
      *   At most 46 characters (a TON address has 46 matchable characters after the `EQ`/`UQ` tag).
-     * @param showProcess - Log each attempted address. Default: `false`
-     * @param showResult  - Log the found wallet to console. Default: `false`
-     * @param saveResult  - Save the result to a text file. Default: `false`
-     * @throws {Error} If `targetEnding` contains invalid characters or is longer than 46 characters.
+     * @param options - Optional configuration.
+     * @throws {Error} If `targetEnding` contains invalid characters or is longer than 46
+     *   characters, or if `walletVersion` is not a supported version.
+     * @throws {RangeError} If `workers` is not a positive integer or `'auto'`.
      */
     constructor(
         targetEnding: string,
-        showProcess?: boolean,
-        showResult?: boolean,
-        saveResult?: boolean
+        options?: TonWalletFinderOptions
     );
 
     /**

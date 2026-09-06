@@ -11,6 +11,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [5.0.0] — 2026-09-06
+
+### Breaking Changes
+- **Options-object constructor.** `TonWalletFinder(targetEnding, showProcess, showResult,
+  saveResult)` is replaced by `TonWalletFinder(targetEnding, { showProcess, showResult,
+  saveResult, workers, walletVersion })`. No positional-argument fallback — see the migration
+  table below.
+- **`workers` moved to the constructor.** It was a `findWalletWithEnding()`-only option since
+  4.1.0; it is now also a constructor option that sets the default for every call on that
+  instance. `findWalletWithEnding({ workers })` still accepts `workers` as a per-call override
+  of the constructor default, exactly as `signal` already worked.
+
+### Added
+- `walletVersion` constructor option. Only `'v4r2'` (the existing, and now default, behaviour)
+  is accepted for now — anything else throws at construction time. This reserves the option
+  name and default so that adding `'v3r2'` / `'v5r1'` support later is an additive (minor)
+  change, not another breaking one.
+- `index.d.ts`: `TonWalletFinderOptions` interface and `WalletVersion` type; `workers` and
+  `walletVersion` added as readonly instance properties on `TonWalletFinder`.
+
+### Migration checklist
+
+| v4.x position | v5.0.0 key |
+|---|---|
+| `new TonWalletFinder(targetEnding, showProcess, showResult, saveResult)` | `new TonWalletFinder(targetEnding, { showProcess, showResult, saveResult })` |
+| `findWalletWithEnding({ workers })` (per-call only) | `new TonWalletFinder(targetEnding, { workers })` (default) or `findWalletWithEnding({ workers })` (per-call override, unchanged) |
+| *(none)* | `walletVersion` — new, defaults to `'v4r2'` (only supported value for now) |
+
+```js
+// v4.x
+new TonWalletFinder('abc', false, true, false);
+
+// v5.0.0
+new TonWalletFinder('abc', { showResult: true });
+```
+
+---
+
 ## [4.1.0] — 2026-09-06
 
 ### Added
