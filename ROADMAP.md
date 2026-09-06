@@ -5,73 +5,64 @@ shift. See [CHANGELOG.md](CHANGELOG.md) for what has already shipped.
 
 ---
 
-## v5.0.0 — options API + wallet version selection
+## ✅ Shipped: options API + wallet version selection
 
-Breaking release. Two changes bundled together because both touch the constructor
-signature; shipping them separately would mean two major bumps in a row.
+Planned as one bundled major (v5.0.0); shipped as two releases instead, because
+adding the `walletVersion` option in 5.0.0 with `'v4r2'` as its only accepted value
+made the later version support additive — so it needed a minor bump, not a second
+major one.
 
-### 1. Options-object constructor
+### 1. Options-object constructor — **shipped in 5.0.0**
 
-Replace the four positional booleans with a single options object:
+The four positional booleans were replaced by a single options object:
 
 ```js
-// v4.x (current)
+// v4.x
 new TonWalletFinder(targetEnding, showProcess, showResult, saveResult)
 
-// v5.0.0
+// v5.0.0+
 new TonWalletFinder(targetEnding, {
   showProcess,
   showResult,
   saveResult,
-  workers,        // already exists as a findWalletWithEnding() option in 4.1.0 —
-                   // move it here so it's visible at construction time
-  walletVersion,  // see below
+  workers,        // was a findWalletWithEnding() option in 4.1.0
+  walletVersion,
 })
 ```
 
-Clean break, no positional-argument fallback — this is what majors are for, and a
-shim would keep the awkward call shape alive as "supported."  Document the mapping
-from v4 positions to v5 keys in the CHANGELOG migration table, same format used for
-the v2→v3 and v2/v3→v4 migrations already in the README.
+Clean break, no positional-argument fallback. `workers` moved to the constructor as
+the per-instance default; `findWalletWithEnding({ signal, workers })` still takes
+`workers` as a per-call override, matching how `signal` works. The v4→v5 migration
+table is in the CHANGELOG and the README.
 
-`findWalletWithEnding({ signal, workers })` keeps taking `workers` too, as a
-per-call override of the constructor default — matches how `signal` already works
-(per-call, not per-instance).
+### 2. Wallet version selection — **shipped in 5.1.0**
 
-### 2. Wallet version selection
+`walletVersion` accepts `'v3r2' | 'v4r2' | 'v5r1'`, default `'v4r2'` (unchanged
+addresses for callers who don't pass the option).
 
-New `walletVersion` option, default `'v4r2'` (keeps current behaviour and the
-current default output identical — no silent address change for existing callers
-who don't pass the option).
-
-Candidates, in priority order:
-
-| Version | Notes |
+| Version | Status |
 |---|---|
-| `'v4r2'` | Already implemented (`walletV4Address` in `index.js`). Becomes the default case of a version-dispatch function. |
-| `'v3r2'` | Simpler data cell than v4 (seqno + subwallet_id + pubkey, no plugins bit, no completion-bit padding needed — 320 bits is byte-aligned). Lower implementation risk than v5r1. |
-| `'v5r1'` (W5) | Different code cell, and the data cell's `wallet_id` is not a flat constant the way v4's subwallet_id is — it encodes workchain, wallet version and a network-global-id. Needs to be derived carefully, not guessed from memory. |
+| `'v4r2'` | Default case of the version-dispatch function (`walletAddress()`) |
+| `'v3r2'` | Data cell `seqno + subwallet_id + pubkey` (320 bits, byte-aligned) |
+| `'v5r1'` (W5) | `wallet_id` derived as the mainnet client context XOR network global id `-239`, as `@ton/ton`'s `storeWalletIdV5R1` builds it |
 
-**Non-negotiable before merging any new version:** a reference-vector test in
-`test/crypto.test.js`, generated the same way the v4r2 vector was — a real mnemonic
-run through `@ton/ton`'s `WalletContractV3R2` / `WalletContractV5R1` (installed
-temporarily in a scratch directory, never as a project dependency) to get the code
-hash, depth and a known-good address to assert against. Do not hand-derive or
-recall these constants; the whole point of the existing test is that a wrong
-constant produces a valid-looking address that isn't the mnemonic's real address —
-exactly the failure mode a vanity-address tool must never have.
+Reference vectors for all three versions live in `test/crypto.test.js`, generated the
+way the original v4r2 vector was: the reference mnemonic run through `@ton/ton`'s
+`WalletContractV3R2` / `WalletContractV5R1` in a scratch directory (never a project
+dependency) for the code hash, depth and a known-good address. The same run
+re-confirmed the existing v4r2 constants.
 
-`index.d.ts`: `walletVersion?: 'v3r2' | 'v4r2' | 'v5r1'`. README: one row per
-version in the options table, and a short note that different versions produce
-different addresses from the same mnemonic (so `walletVersion` must match whatever
-wallet software the user will actually import the mnemonic into).
+Workers receive `walletVersion` through `workerData`, so parallel searches derive the
+same addresses as the single-threaded path.
 
-### Also worth bundling into v5 (smaller, optional)
+---
 
-- Drop Node.js 20 from `engines` (`>=22`) — it's EOL since 2026-04-30 and CI already
-  covers 22/24/26. Only do this if it doesn't need its own justification separate
-  from the two changes above; otherwise leave it for whenever `engines` next moves.
-- `err.name = 'AbortError'` already ships (4.0.1); no further work needed there.
+## Not done from the v5 plan
+
+- **Drop Node.js 20 from `engines` (`>=22`).** It was EOL on 2026-04-30 and CI covers
+  22/24/26, but it was left out of 5.0.0 rather than bundled in without its own
+  justification. Still a candidate for whenever `engines` next moves — which now needs
+  its own major, since 5.x already shipped with `>=20`.
 
 ---
 
@@ -84,8 +75,13 @@ from a list of owner public keys plus a threshold, and building that (a TVM
 of the library holds to) is a different and much larger project than this one.
 Not planned.
 
-### Smaller open item
+### Smaller open items
 
 - Optional encrypted output for `saveResultsToFile` (password-based, `crypto.scrypt`
   + AES-GCM, no new dependency) — came up in the original review as a nice-to-have,
-  not urgent. Candidate for a v5.x minor once v5.0.0 ships.
+  not urgent. Candidate for a 5.2.0.
+- Non-default `walletVersion` parameters are currently fixed: workchain 0 is the only
+  value reachable through `TonWalletFinder` (the `_internals` primitives take a
+  `workchain` argument), and `v5r1` is pinned to the mainnet wallet id with subwallet
+  number 0. Testnet W5 addresses (network global id `-3`) and non-zero subwallet
+  numbers would need new options — no demand for them so far.
