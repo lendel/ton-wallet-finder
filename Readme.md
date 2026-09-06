@@ -187,7 +187,8 @@ path of the written file, or `undefined` if writing failed (the error is logged,
   `cellHash`, `padBits`, `crc16`). Exported for testing and advanced use; not yet covered by
   semver guarantees.
 
-TypeScript declarations are included (`index.d.ts`).
+TypeScript declarations are included (`index.d.ts`) and are checked in CI against the
+implementation by `test/types.test-d.ts`, so they cannot drift from the runtime API.
 
 ---
 
@@ -502,7 +503,8 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
   `cellHash`, `padBits`, `crc16`). Экспортированы для тестов и продвинутого использования; пока
   не покрыты гарантиями semver.
 
-Поставляется с декларациями TypeScript (`index.d.ts`).
+Поставляется с декларациями TypeScript (`index.d.ts`); в CI они проверяются на
+соответствие реализации тестом `test/types.test-d.ts`, поэтому не могут разойтись с API.
 
 ### Производительность
 

@@ -9,14 +9,21 @@ on:
       - "v*"
   workflow_dispatch:   # manual re-run from the Actions tab if a tagged run failed
 
+# Least privilege by default; the publish job widens this for OIDC.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test before publish
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
         with:
@@ -25,6 +32,7 @@ jobs:
 
       - run: npm ci
       - run: npm run lint
+      - run: npm run typecheck
       - run: npm test
       - run: npm audit --audit-level=high --omit=dev
 
@@ -32,11 +40,14 @@ jobs:
     name: Publish to npm
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
       id-token: write  # OIDC token for npm trusted publishing + provenance
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
         with:

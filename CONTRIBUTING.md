@@ -13,7 +13,7 @@ npm install
 ```
 
 **Requirements:** Node.js 20 or higher (matches `engines` in `package.json`). Develop on
-Node.js 22 or 24 (LTS); CI runs the suite on 20, 22, 24 and 26. Node.js 20 is end-of-life
+Node.js 22 or 24 (LTS) — `.nvmrc` pins 22 for `nvm use`; CI runs the suite on 20, 22, 24 and 26. Node.js 20 is end-of-life
 (30 April 2026) and is kept only until the next major release.
 
 ---
@@ -22,16 +22,26 @@ Node.js 22 or 24 (LTS); CI runs the suite on 20, 22, 24 and 26. Node.js 20 is en
 
 | Command | Description |
 |---------|-------------|
-| `npm test` | Run the full test suite (Mocha) |
-| `npm run lint` | Run ESLint on `index.js`, `worker.js` and `test/` |
+| `npm run check` | Everything CI runs: lint + typecheck + tests |
+| `npm test` | Run the full test suite (Mocha, configured by `.mocharc.json`) |
+| `npm run lint` | Run ESLint over the whole repository |
+| `npm run typecheck` | Compile `index.d.ts` and `test/types.test-d.ts` with `tsc --noEmit` |
+
+Run `npm run check` before opening a PR — CI runs the same three steps.
 
 ---
 
 ## Code Style
 
 - All source code uses `'use strict'`
-- ESLint enforces `no-var`, `prefer-const`, `eqeqeq` (always), `no-unused-vars`, `no-undef`
-- Run `npm run lint` before submitting a PR — CI will fail otherwise
+- ESLint runs the flat config in `eslint.config.js`: `@eslint/js` **recommended**
+  plus `no-var`, `prefer-const`, `eqeqeq` (always), `curly`, `no-shadow`,
+  `no-throw-literal`, `no-implicit-coercion`, `prefer-promise-reject-errors`,
+  `require-atomic-updates` and `object-shorthand`
+- Globals come from the `globals` package (`globals.node`, `globals.mocha`) — do not
+  hand-maintain a globals list
+- `npm run lint` lints **every** file in the repository (`eslint .`), the config file included
+- Run `npm run check` before submitting a PR — CI will fail otherwise
 
 ---
 
@@ -45,19 +55,43 @@ Tests live in `test/` (Mocha + Chai + Sinon):
 | `workers.test.js` | Worker-thread pool (deterministic fake workers + real-thread integration) |
 | `crypto.test.js` | Reference vectors for mnemonic → key → address, `cellHash`, `padBits`, `crc16` |
 | `esm.test.mjs` | Package is importable from ES modules through the `exports` map |
+| `types.test-d.ts` | Compile-time assertions on `index.d.ts` (not run by Mocha — see below) |
 
 - Every new feature or bug fix must include a corresponding test
 - All stubs must be restored (use `try/finally` with `stub.restore()`)
 - Tests that involve real key generation carry `this.timeout(60000)` — this is intentional
 
-### Dev-dependency note: Chai v4
+### Dev-dependency policy
+
+The package has **zero production dependencies** and that is a hard rule — new
+functionality must be built on Node.js built-ins (`npm ls --omit=dev` must stay
+empty). Dev dependencies are pinned to exact versions (no `^`, no `~`) so `npm ci`
+and CI resolve identically; Dependabot proposes the bumps weekly
+(`.github/dependabot.yml`).
 
 `chai` is intentionally pinned to `4.3.7` and **must not be upgraded to v5+**.
-Chai v5 dropped CommonJS support. Since this package is a pure CJS library and does not use ESM, upgrading chai would break the test suite without any benefit.
+Chai v5 dropped CommonJS support. Since this package is a pure CJS library and does
+not use ESM, upgrading chai would break the test suite without any benefit — the
+Dependabot config already ignores `chai >= 5`.
 
 ### Reference vectors
 
 `test/crypto.test.js` pins the mnemonic → key → address derivation to a vector produced with `@ton/crypto` and `@ton/ton`. If you touch anything in the crypto or cell-hashing code and this test goes red, the change is wrong — do not update the vector to make it pass.
+
+### Type-declaration test
+
+`index.d.ts` is hand-written, so nothing derives it from the implementation — it can
+drift silently. `test/types.test-d.ts` pins it: it imports the package **by name**
+(so the `types` entries in the `exports` map are resolved the way a consumer's
+TypeScript resolves them) and asserts each exported type with `expectType<T>()` and
+`@ts-expect-error`. It is never executed; `npm run typecheck` compiles it with
+`tsc --noEmit` under `strict` (plus `exactOptionalPropertyTypes` and
+`noUncheckedIndexedAccess`) and both a wrong type *and* an `@ts-expect-error` that no
+longer suppresses anything fail the build. Mocha does not pick it up — `.mocharc.json`
+only loads `.test.js` / `.test.mjs`.
+
+**Any change to the public API must touch `index.d.ts` and `test/types.test-d.ts`
+together.**
 
 ### ESM regression test
 
@@ -69,9 +103,14 @@ Chai v5 dropped CommonJS support. Since this package is a pure CJS library and d
 
 1. Fork the repository and create a feature branch
 2. Write tests for your changes
-3. Ensure `npm run lint` and `npm test` both pass
-4. Update `CHANGELOG.md` under `[Unreleased]`
-5. Open a PR against `master`
+3. Ensure `npm run check` passes (lint + typecheck + tests)
+4. Update `index.d.ts` and `test/types.test-d.ts` if the public API changed
+5. Update `CHANGELOG.md` under `[Unreleased]`
+6. Open a PR against `master`
+
+CI additionally packs the tarball and installs it into a scratch project
+(the `Package contents` job), so a new runtime file that is missing from the
+`files` whitelist in `package.json` fails the PR rather than the release.
 
 ---
 
@@ -96,8 +135,8 @@ Releases are published by CI only (`.github/workflows/publish.yml`), never from 
    ```sh
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-3. The workflow checks that the tag matches `package.json`, runs lint + tests on
-   Node.js 24, then `npm publish --provenance`.
+3. The workflow checks that the tag matches `package.json`, runs lint + typecheck +
+   tests + `npm audit` on Node.js 24, then `npm publish --provenance`.
 
 ### Authentication: npm trusted publishing (OIDC)
 

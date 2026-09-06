@@ -282,7 +282,7 @@ const WALLET_ADDRESS_BY_VERSION = {
  * different addresses from the same key — the version must match the wallet
  * software the mnemonic will be imported into.
  */
-function walletAddress(version, pubkey, workchain = 0) {
+function deriveWalletAddress(version, pubkey, workchain = 0) {
     const derive = WALLET_ADDRESS_BY_VERSION[version];
     if (!derive) {
         throw new Error(`Unsupported wallet version: ${JSON.stringify(version)}`);
@@ -366,7 +366,7 @@ class TonWalletFinder {
     // Returns an address object with a .toString() method — same interface as
     // the original @ton/core Address so callers are unaffected.
     createWallet(keyPair) {
-        const str = walletAddress(this.walletVersion, Buffer.from(keyPair.publicKey));
+        const str = deriveWalletAddress(this.walletVersion, Buffer.from(keyPair.publicKey));
         return { toString: () => str };
     }
 
@@ -616,7 +616,7 @@ module.exports._internals = {
     mnemonicNew,
     mnemonicToPrivateKey,
     isBasicSeed,
-    walletAddress,
+    walletAddress: deriveWalletAddress,
     walletV3R2Address,
     walletV4Address,
     walletV5R1Address,

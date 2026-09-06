@@ -23,8 +23,10 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "lint": "eslint index.js worker.js test/",
-    "test": "mocha --recursive"
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "mocha",
+    "check": "npm run lint && npm run typecheck && npm test"
   },
   "repository": {
     "type": "git",
@@ -69,12 +71,20 @@
   },
   "homepage": "https://github.com/lendel/ton-wallet-finder#readme",
   "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.1",
     "chai": "4.3.7",
     "eslint": "10.1.0",
+    "globals": "17.12.0",
     "mocha": "12.0.0",
-    "sinon": "21.0.3"
+    "sinon": "21.0.3",
+    "typescript": "5.9.3"
   },
   "engines": {
     "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

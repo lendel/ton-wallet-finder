@@ -1,67 +1,58 @@
 'use strict';
 
+const js      = require('@eslint/js');
+const globals = require('globals');
+
+// Layered on top of `js.configs.recommended`, which already covers
+// no-unused-vars, no-undef, no-constant-condition, no-duplicate-case, …
 const rules = {
-    'no-unused-vars':        'error',
-    'no-undef':              'error',
-    'no-console':            'off',   // library intentionally uses console for user feedback
-    'no-constant-condition': 'error',
-    'no-duplicate-case':     'error',
-    'no-throw-literal':      'error',
-    'curly':                 ['error', 'all'],
-    'eqeqeq':                ['error', 'always'],
-    'no-var':                'error',
-    'prefer-const':          'error',
-};
-
-const nodeGlobals = {
-    require:         'readonly',
-    module:          'readonly',
-    exports:         'readonly',
-    process:         'readonly',
-    Buffer:          'readonly',
-    console:         'readonly',
-    __dirname:       'readonly',
-    AbortController: 'readonly',
-    AbortSignal:     'readonly',
-    setTimeout:      'readonly',
-    clearTimeout:    'readonly',
-};
-
-const mochaGlobals = {
-    describe:   'readonly',
-    it:         'readonly',
-    beforeEach: 'readonly',
-    afterEach:  'readonly',
-    before:     'readonly',
-    after:      'readonly',
+    'no-console':                   'off',   // library intentionally uses console for user feedback
+    'curly':                        ['error', 'all'],
+    'eqeqeq':                       ['error', 'always'],
+    'no-implicit-coercion':         'error',
+    'no-shadow':                    'error',
+    'no-throw-literal':             'error',
+    'no-var':                       'error',
+    'object-shorthand':             ['error', 'properties'],
+    'prefer-const':                 'error',
+    'prefer-promise-reject-errors': 'error',
+    'require-atomic-updates':       'error',
 };
 
 module.exports = [
     {
-        files: ['index.js', 'worker.js', 'eslint.config.js'],
-        languageOptions: {
-            ecmaVersion: 2022,
-            sourceType:  'commonjs',
-            globals:     nodeGlobals,
-        },
+        ignores: ['node_modules/**', 'coverage/**'],
+    },
+
+    js.configs.recommended,
+
+    {
         rules,
     },
+
+    {
+        // CommonJS sources and this config file itself.
+        files: ['**/*.js'],
+        languageOptions: {
+            ecmaVersion: 2023,
+            sourceType:  'commonjs',
+            globals:     globals.node,
+        },
+    },
+
     {
         files: ['test/**/*.js'],
         languageOptions: {
-            ecmaVersion: 2022,
-            sourceType:  'commonjs',
-            globals:     { ...nodeGlobals, ...mochaGlobals },
+            globals: { ...globals.node, ...globals.mocha },
         },
-        rules,
     },
+
     {
         files: ['test/**/*.mjs'],
         languageOptions: {
-            ecmaVersion: 2022,
+            ecmaVersion: 2023,
             sourceType:  'module',
-            globals:     { ...nodeGlobals, ...mochaGlobals },
+            globals:     { ...globals.node, ...globals.mocha },
         },
-        rules,
     },
 ];

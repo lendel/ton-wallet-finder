@@ -1,0 +1,7 @@
+# Discussions are not enabled on this repository, so blank issues stay available
+# for questions that neither template fits.
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/lendel/ton-wallet-finder/security/advisories/new
+    about: Report privately — never in a public issue. See SECURITY.md.

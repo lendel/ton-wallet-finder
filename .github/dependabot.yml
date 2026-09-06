@@ -1,0 +1,35 @@
+version: 2
+
+updates:
+  # Dev dependencies only — the package itself has zero production dependencies.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    labels:
+      - "dependencies"
+    ignore:
+      # Chai v5+ is ESM-only; this package is pure CommonJS. See CONTRIBUTING.md.
+      - dependency-name: "chai"
+        versions: [">=5.0.0"]
+
+  # Keeps the SHA-pinned action versions in .github/workflows current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "dependencies"
+      - "github-actions"

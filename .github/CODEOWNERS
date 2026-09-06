@@ -1,0 +1,13 @@
+# Default owner for everything in the repository.
+*                       @lendel
+
+# Crypto and address derivation: a wrong constant here silently produces
+# addresses nobody can spend from. Always needs the maintainer's review.
+/index.js               @lendel
+/worker.js              @lendel
+/wordlist.js            @lendel
+/test/crypto.test.js    @lendel
+
+# Release and supply-chain surface.
+/.github/workflows/     @lendel
+/package.json           @lendel

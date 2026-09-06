@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in the library behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste a private key, a secret key or a 24-word mnemonic into a public issue.**
+        If a real address and its mnemonic disagree, report it privately instead — see
+        [SECURITY.md](https://github.com/lendel/ton-wallet-finder/blob/master/SECURITY.md).
+
+  - type: input
+    id: version
+    attributes:
+      label: ton-wallet-finder version
+      placeholder: "5.1.1"
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version (`node -v`)
+      placeholder: "v22.11.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 24.04 / macOS 15 / Windows 11"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: The smallest snippet that shows the problem.
+      render: javascript
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+      description: Include the full error message and stack trace if there is one.
+    validations:
+      required: true

@@ -1,0 +1,9 @@
+{
+  "spec": ["test/**/*.test.js", "test/**/*.test.mjs"],
+  "recursive": true,
+  "extension": ["js", "mjs"],
+  "timeout": 2000,
+  "slow": 500,
+  "forbid-only": true,
+  "check-leaks": false
+}

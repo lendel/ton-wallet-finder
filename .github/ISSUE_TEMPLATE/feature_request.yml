@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest a new option or capability
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check [ROADMAP.md](https://github.com/lendel/ton-wallet-finder/blob/master/ROADMAP.md) first — some ideas
+        (multisig, for example) have already been considered and declined.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that the library does not let you do today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API
+      description: How would it look from a caller's point of view?
+      render: javascript
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Constraints
+      options:
+        - label: This can be implemented with Node.js built-ins only (the package has zero production dependencies).

@@ -6,10 +6,20 @@ on:
   pull_request:
     branches: ["main", "master"]
 
+# Least privilege by default; jobs widen this only where they must.
+permissions:
+  contents: read
+
+# A new push to the same branch or PR supersedes the run already in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
 
@@ -21,6 +31,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
@@ -34,8 +46,62 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Typecheck (index.d.ts + type tests)
+        run: npm run typecheck
+
       - name: Run tests
         run: npm test
 
       - name: Security audit (production deps only)
         run: npm audit --audit-level=high --omit=dev
+
+  package:
+    name: Package contents
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        with:
+          node-version: 24.x
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `files` in package.json is a whitelist: a new runtime source file that is
+      # not listed would publish a broken tarball. Fail here instead of on npm.
+      - name: Verify the published tarball is installable and complete
+        run: |
+          set -euo pipefail
+          npm pack --silent
+          TARBALL=$(ls -1 ton-wallet-finder-*.tgz)
+          echo "Packed $TARBALL"
+          tar -tzf "$TARBALL" | sort
+          mkdir -p /tmp/consumer && cd /tmp/consumer
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund "$GITHUB_WORKSPACE/$TARBALL"
+          node -e "
+            const { TonWalletFinder, saveResultsToFile, _internals } = require('ton-wallet-finder');
+            const pub = Buffer.alloc(32, 7);
+            for (const v of ['v3r2', 'v4r2', 'v5r1']) {
+              const a = _internals.walletAddress(v, pub);
+              if (a.length !== 48) { throw new Error(v + ' address has length ' + a.length); }
+            }
+            if (typeof saveResultsToFile !== 'function') { throw new Error('saveResultsToFile missing'); }
+            new TonWalletFinder('a', { workers: 2, walletVersion: 'v5r1' });
+            console.log('installed package loads and derives addresses');
+          "
+          node --input-type=module -e "
+            import { TonWalletFinder } from 'ton-wallet-finder';
+            if (typeof TonWalletFinder !== 'function') { throw new Error('ESM named export missing'); }
+            console.log('installed package imports from ESM');
+          "

@@ -9,6 +9,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Tooling, CI and repository standards only. No public API and no runtime behaviour
+changed: the only edit to a shipped source file is the module-private rename noted
+under *Changed*, which the existing 103 tests cover unchanged.
+
+### Added
+- **Type-declaration tests.** `test/types.test-d.ts` asserts the whole public type surface
+  of the hand-written `index.d.ts` (`expectType<T>()` + `@ts-expect-error`), importing the
+  package by name so the `types` entries in the `exports` map resolve as a consumer's
+  TypeScript resolves them. `npm run typecheck` compiles it with `tsc --noEmit` under
+  `strict`, `exactOptionalPropertyTypes` and `noUncheckedIndexedAccess`. Until now nothing
+  verified that `index.d.ts` even parsed, let alone matched the implementation.
+- `npm run check` — the three commands CI runs (lint, typecheck, test) in one script.
+- `tsconfig.json` (type-checking only, `noEmit`; not published).
+- `.mocharc.json` — the Mocha configuration is now explicit (`spec`, `extension`, `timeout`,
+  `slow`) and `forbid-only` makes a stray `.only()` fail CI instead of silently skipping
+  the rest of the suite.
+- CI job **Package contents**: `npm pack`, install the tarball into a scratch project, then
+  load it through both `require()` and `import`. A new runtime file missing from the `files`
+  whitelist in `package.json` now fails the PR instead of shipping a broken release.
+- `.github/workflows/codeql.yml` — CodeQL static analysis (`security-and-quality`) on pushes,
+  PRs and weekly.
+- `.github/dependabot.yml` — weekly npm and GitHub Actions updates, with `chai >= 5` ignored
+  (it is ESM-only; see CONTRIBUTING.md).
+- `.github/ISSUE_TEMPLATE/` (bug report, feature request, security contact link),
+  `.github/pull_request_template.md`, `.github/CODEOWNERS`, `.nvmrc`.
+- `publishConfig` (`access: public`, `provenance: true`) so a manual publish matches CI.
+
+### Changed
+- **ESLint config rebuilt on `@eslint/js` recommended.** The previous config hand-listed ten
+  rules and a hand-maintained globals map that was missing `URL`, `TextEncoder`,
+  `structuredClone`, `setInterval` and others — any future use of them would have tripped a
+  spurious `no-undef`. Globals now come from the `globals` package, and the recommended set
+  is layered with `no-shadow`, `no-implicit-coercion`, `prefer-promise-reject-errors`,
+  `require-atomic-updates` and `object-shorthand`. Deprecated `no-return-await` dropped.
+- `npm run lint` is now `eslint .` — it covers every file in the repository, including
+  `eslint.config.js` and `wordlist.js`, which the explicit file list had missed.
+- CI and publish workflows: top-level `permissions: contents: read`, `persist-credentials: false`
+  on every checkout, per-job `timeout-minutes`, and a `concurrency` group on CI so a new push
+  cancels the superseded run. Both workflows now run `npm run typecheck`.
+- Dev dependencies are pinned to exact versions (`@eslint/js`, `globals`, `typescript`,
+  `@types/node` added; all zero-dependency). Production dependencies remain **zero**.
+- `.gitignore` now covers `*.tgz`, `coverage/` and — importantly — `ton_wallet_results*.txt`,
+  the file `saveResult: true` writes private keys into.
+- `SECURITY.md`: the supported-versions table still claimed 4.x was supported and did not
+  mention 5.x at all. Corrected.
+- The module-private address-dispatch function was renamed `walletAddress` →
+  `deriveWalletAddress` to stop it shadowing the `walletAddress` local/parameter used
+  throughout the class. `_internals.walletAddress` is unchanged — the export key, its
+  signature and its behaviour are all the same.
+
 ---
 
 ## [5.1.1] — 2026-09-06

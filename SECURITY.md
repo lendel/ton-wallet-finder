@@ -2,9 +2,14 @@
 
 ## Supported versions
 
+Only the latest minor of the current major line receives fixes. Older majors
+depend on `@ton/ton` / `@ton/crypto` and their transitive packages, which this
+project no longer tracks.
+
 | Version | Supported |
 |---------|-----------|
-| 4.x     | yes       |
+| 5.x     | yes       |
+| 4.x     | no        |
 | < 4.0   | no        |
 
 ## Reporting a vulnerability
