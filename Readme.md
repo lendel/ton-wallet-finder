@@ -89,7 +89,7 @@ new TonWalletFinder(targetEnding, {
   showResult,    // boolean
   saveResult,    // boolean
   workers,       // number | 'auto'
-  walletVersion, // 'v4r2'
+  walletVersion, // 'v3r2' | 'v4r2' | 'v5r1'
 });
 ```
 
@@ -100,7 +100,24 @@ new TonWalletFinder(targetEnding, {
 | `options.showResult` | `boolean` | `false` | Log found wallet details to console. **Keep `false` in shared/logged environments to avoid exposing private keys.** |
 | `options.saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` in the current working directory. Never overwrites: an existing file gets a `-2`, `-3`, … suffix |
 | `options.workers` | `number \| 'auto'` | `1` | Default worker-thread count for `findWalletWithEnding()` (see [Performance](#performance)). Overridable per call. |
-| `options.walletVersion` | `'v4r2'` | `'v4r2'` | TON wallet contract version to derive the address for. Only `'v4r2'` is supported today; different versions produce different addresses from the same mnemonic, so this must match whatever wallet software you'll import the mnemonic into. |
+| `options.walletVersion` | `'v3r2' \| 'v4r2' \| 'v5r1'` | `'v4r2'` | TON wallet contract version to derive the address for — see [Wallet versions](#wallet-versions). |
+
+### Wallet versions
+
+| `walletVersion` | Contract | Notes |
+|---|---|---|
+| `'v3r2'` | WalletV3R2 | Legacy contract, still importable in most wallets |
+| `'v4r2'` | WalletV4R2 | **Default.** Same addresses as every previous release |
+| `'v5r1'` | WalletV5R1 (W5) | Current default in Tonkeeper / MyTonWallet and others. Mainnet wallet id, subwallet 0 |
+
+> **The same mnemonic gives a different address for every version.** The vanity address you
+> find only exists for the version you searched with, so `walletVersion` must match the
+> wallet software you will import the 24 words into (and the version selected there). If you
+> are unsure, check which address format your wallet shows for an existing seed phrase.
+
+```javascript
+const finder = new TonWalletFinder('abc', { walletVersion: 'v5r1' });
+```
 
 ---
 
@@ -164,10 +181,11 @@ path of the written file, or `undefined` if writing failed (the error is logged,
 - `finder.createKeyPair()` → `Promise<{ keyPair: { publicKey, secretKey }, words }>` — a fresh
   24-word TON mnemonic and its Ed25519 key pair.
 - `finder.createWallet(keyPair)` → object whose `toString()` returns the bounceable, URL-safe
-  WalletV4 address (synchronous).
+  address for the configured `walletVersion` (synchronous).
 - `_internals` — the primitives behind the above (`mnemonicNew`, `mnemonicToPrivateKey`,
-  `isBasicSeed`, `walletV4Address`, `cellHash`, `padBits`, `crc16`). Exported for testing and
-  advanced use; not yet covered by semver guarantees.
+  `isBasicSeed`, `walletAddress`, `walletV3R2Address`, `walletV4Address`, `walletV5R1Address`,
+  `cellHash`, `padBits`, `crc16`). Exported for testing and advanced use; not yet covered by
+  semver guarantees.
 
 TypeScript declarations are included (`index.d.ts`).
 
@@ -209,9 +227,10 @@ new TonWalletFinder('abc', false, true, false);
 new TonWalletFinder('abc', { showResult: true });
 ```
 
-It also adds a `walletVersion` option, reserved for upcoming `'v3r2'`/`'v5r1'` support.
-Today only `'v4r2'` (the existing default behaviour) is accepted — passing anything else
-throws at construction time.
+Version 5.1.0 adds **wallet version selection**: `walletVersion: 'v3r2' | 'v4r2' | 'v5r1'`.
+The default stays `'v4r2'`, so existing callers keep getting exactly the same addresses;
+`'v5r1'` (W5) is what current Tonkeeper / MyTonWallet create by default. See
+[Wallet versions](#wallet-versions).
 
 See [Migration from v4](#-migration-from-v4) below for the full breaking-change table.
 
@@ -245,7 +264,7 @@ The public API is identical — no code changes required when upgrading from v3.
 |---|---|---|
 | Constructor signature | `TonWalletFinder(targetEnding, showProcess, showResult, saveResult)` | `TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers, walletVersion })` |
 | `workers` | `findWalletWithEnding({ workers })` only, default `1` | Also a constructor option (sets the default); `findWalletWithEnding({ workers })` still overrides it per call |
-| `walletVersion` | did not exist | New option, default `'v4r2'` (only supported value for now) |
+| `walletVersion` | did not exist | New option, default `'v4r2'`; `'v3r2'` / `'v5r1'` accepted since 5.1.0 |
 
 ### Migration checklist
 
@@ -271,8 +290,8 @@ The public API is identical — no code changes required when upgrading from v3.
    per-call override.
 
 3. **`walletVersion`** — nothing to do; it defaults to `'v4r2'`, which is what v4.x always
-   produced. It exists now only so it can be validated; `'v3r2'`/`'v5r1'` are not implemented
-   yet.
+   produced. Pass `'v3r2'` or `'v5r1'` only if that is the wallet type you will import the
+   mnemonic into.
 
 ---
 
@@ -386,7 +405,7 @@ new TonWalletFinder(targetEnding, {
   showResult,    // boolean
   saveResult,    // boolean
   workers,       // number | 'auto'
-  walletVersion, // 'v4r2'
+  walletVersion, // 'v3r2' | 'v4r2' | 'v5r1'
 });
 ```
 
@@ -397,7 +416,25 @@ new TonWalletFinder(targetEnding, {
 | `options.showResult` | `boolean` | `false` | Вывести найденный кошелёк в консоль. **Оставьте `false` в окружениях с логированием, чтобы не раскрывать приватный ключ.** |
 | `options.saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` в текущей рабочей директории. Существующий файл не перезаписывается: добавляется суффикс `-2`, `-3`, … |
 | `options.workers` | `number \| 'auto'` | `1` | Значение по умолчанию для числа воркеров в `findWalletWithEnding()` (см. [Производительность](#производительность)). Можно переопределить при вызове. |
-| `options.walletVersion` | `'v4r2'` | `'v4r2'` | Версия контракта TON-кошелька для деривации адреса. Пока поддерживается только `'v4r2'`; разные версии дают разные адреса из одной и той же мнемоники, поэтому значение должно совпадать с тем кошельком, в который вы будете импортировать мнемонику. |
+| `options.walletVersion` | `'v3r2' \| 'v4r2' \| 'v5r1'` | `'v4r2'` | Версия контракта TON-кошелька для деривации адреса — см. [Версии кошелька](#версии-кошелька). |
+
+#### Версии кошелька
+
+| `walletVersion` | Контракт | Примечания |
+|---|---|---|
+| `'v3r2'` | WalletV3R2 | Устаревший контракт, но импортируется большинством кошельков |
+| `'v4r2'` | WalletV4R2 | **По умолчанию.** Те же адреса, что и во всех предыдущих версиях библиотеки |
+| `'v5r1'` | WalletV5R1 (W5) | Текущий стандарт по умолчанию в Tonkeeper / MyTonWallet и др. Mainnet wallet id, subwallet 0 |
+
+> **Одна и та же мнемоника даёт разный адрес для каждой версии.** Найденный красивый адрес
+> существует только для той версии, с которой вы искали, поэтому `walletVersion` должен
+> совпадать с типом кошелька, в который вы импортируете 24 слова (и с версией, выбранной
+> в нём). Если не уверены — посмотрите, какой адрес ваш кошелёк показывает для уже
+> существующей сид-фразы.
+
+```javascript
+const finder = new TonWalletFinder('abc', { walletVersion: 'v5r1' });
+```
 
 ### API
 
@@ -459,10 +496,11 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 - `finder.createKeyPair()` → `Promise<{ keyPair: { publicKey, secretKey }, words }>` — новая
   24-словная TON-мнемоника и её пара ключей Ed25519.
 - `finder.createWallet(keyPair)` → объект, чей `toString()` возвращает bounceable URL-safe
-  адрес WalletV4 (синхронно).
+  адрес для выбранной `walletVersion` (синхронно).
 - `_internals` — примитивы, на которых всё построено (`mnemonicNew`, `mnemonicToPrivateKey`,
-  `isBasicSeed`, `walletV4Address`, `cellHash`, `padBits`, `crc16`). Экспортированы для тестов и
-  продвинутого использования; пока не покрыты гарантиями semver.
+  `isBasicSeed`, `walletAddress`, `walletV3R2Address`, `walletV4Address`, `walletV5R1Address`,
+  `cellHash`, `padBits`, `crc16`). Экспортированы для тестов и продвинутого использования; пока
+  не покрыты гарантиями semver.
 
 Поставляется с декларациями TypeScript (`index.d.ts`).
 
@@ -498,9 +536,10 @@ new TonWalletFinder('abc', false, true, false);
 new TonWalletFinder('abc', { showResult: true });
 ```
 
-Также добавлена опция `walletVersion`, зарезервированная под будущую поддержку
-`'v3r2'`/`'v5r1'`. Пока принимается только `'v4r2'` (нынешнее поведение по умолчанию) —
-любое другое значение вызывает исключение при создании экземпляра.
+В версии 5.1.0 добавлен **выбор версии кошелька**: `walletVersion: 'v3r2' | 'v4r2' | 'v5r1'`.
+По умолчанию остаётся `'v4r2'`, поэтому существующие вызовы получают ровно те же адреса;
+`'v5r1'` (W5) — то, что сейчас создают по умолчанию Tonkeeper / MyTonWallet. См.
+[Версии кошелька](#версии-кошелька).
 
 Полную таблицу breaking-изменений см. в разделе [Миграция с v4](#миграция-с-v4) ниже.
 
@@ -530,7 +569,7 @@ new TonWalletFinder('abc', { showResult: true });
 |---|---|---|
 | Сигнатура конструктора | `TonWalletFinder(targetEnding, showProcess, showResult, saveResult)` | `TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers, walletVersion })` |
 | `workers` | только в `findWalletWithEnding({ workers })`, по умолчанию `1` | Также опция конструктора (задаёт значение по умолчанию); `findWalletWithEnding({ workers })` по-прежнему переопределяет его для конкретного вызова |
-| `walletVersion` | не существовала | Новая опция, по умолчанию `'v4r2'` (пока единственное поддерживаемое значение) |
+| `walletVersion` | не существовала | Новая опция, по умолчанию `'v4r2'`; `'v3r2'` / `'v5r1'` принимаются с 5.1.0 |
 
 #### Чек-лист миграции
 
@@ -556,8 +595,8 @@ new TonWalletFinder('abc', { showResult: true });
    нужно, это по-прежнему работает как переопределение для конкретного вызова.
 
 3. **`walletVersion`** — ничего делать не нужно; по умолчанию `'v4r2'`, то есть ровно то,
-   что v4.x всегда и производила. Опция появилась сейчас только для того, чтобы её можно
-   было валидировать; `'v3r2'`/`'v5r1'` пока не реализованы.
+   что v4.x всегда и производила. Передавайте `'v3r2'` или `'v5r1'` только если именно в
+   такой кошелёк вы будете импортировать мнемонику.
 
 ### Миграция с v2/v3
 

@@ -93,14 +93,35 @@ async function mnemonicToPrivateKey(words) {
 }
 
 // ---------------------------------------------------------------------------
-// WalletV4 address derivation (pure TVM cell hashing, no @ton/core)
+// Wallet address derivation (pure TVM cell hashing, no @ton/core)
 // ---------------------------------------------------------------------------
 
-// Pre-computed constants for the WalletV4R2 code cell (fixed bytecode).
+// Pre-computed constants for each wallet version's code cell (fixed bytecode).
 // hash = SHA-256 of the code cell repr; depth = max ref depth + 1.
-const CODE_HASH  = Buffer.from(
-    'feb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0', 'hex');
-const CODE_DEPTH = 7;
+// Taken from @ton/ton's WalletContractV3R2 / WalletContractV4 / WalletContractV5R1
+// (`init.code.hash()` / `init.code.depth()`), pinned by test/crypto.test.js.
+const WALLET_CODE = {
+    v3r2: {
+        hash:  Buffer.from('84dafa449f98a6987789ba232358072bc0f76dc4524002a5d0918b9a75d2d599', 'hex'),
+        depth: 0,
+    },
+    v4r2: {
+        hash:  Buffer.from('feb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0', 'hex'),
+        depth: 7,
+    },
+    v5r1: {
+        hash:  Buffer.from('20834b7b72b112147e1b2fb457b84e74d1a30f04f737d4f62a668e9552d2b72f', 'hex'),
+        depth: 6,
+    },
+};
+
+// subwallet_id shared by the v3 and v4 wallet contracts (698983191 = 0x29a9a317).
+const DEFAULT_SUBWALLET_ID = 698983191;
+
+// W5 wallet_id is not a flat constant: it is a 32-bit "client context"
+// (1 | workchain:int8 | wallet_version:uint8 | subwallet_number:uint15) XOR'ed
+// with the network global id. Mainnet global id is -239; W5 v5r1 version byte is 0.
+const V5R1_NETWORK_GLOBAL_ID = -239;
 
 /**
  * Compute the TVM-standard SHA-256 hash of a single ordinary cell.
@@ -161,26 +182,24 @@ function crc16(data) {
 }
 
 /**
- * Derive a WalletV4 (workchain 0) address from a 32-byte Ed25519 public key.
- * Returns a bounceable, URL-safe base64 string (48 chars).
+ * Hash a StateInit { code, data } (no split_depth / special / library) and
+ * encode the resulting account id as a bounceable, URL-safe address (48 chars).
+ *
+ * @param {{ hash: Buffer, depth: number }} code   - pre-computed code cell constants
+ * @param {number} dataBits                        - data cell length in bits
+ * @param {Buffer} dataBuf                         - data cell bits, unpadded
+ * @param {number} workchain
  */
-function walletV4Address(pubkey, workchain = 0) {
-    const subwalletId = 698983191 + workchain;
-
-    // ---- Data cell: seqno(32) | subwallet_id(32) | pubkey(256) | has_plugins(1) ----
-    // Total = 321 bits; has_plugins = 0, padBits() sets the trailing "1" completion bit.
-    const dataBuf = Buffer.alloc(41, 0);
-    dataBuf.writeUInt32BE(0,           0);  // seqno
-    dataBuf.writeUInt32BE(subwalletId, 4);  // subwallet_id
-    dataBuf.set(pubkey, 8);                 // 32 bytes public key
-    const dataHash  = cellHash(321, padBits(321, dataBuf), []);
+function stateInitAddress(code, dataBits, dataBuf, workchain) {
+    // The data cells of all supported wallets have no refs, so their depth is 0.
+    const dataHash  = cellHash(dataBits, padBits(dataBits, dataBuf), []);
     const dataDepth = 0;
 
     // ---- StateInit cell: bits = 00110 (5 bits), refs = [code, data] ----
     // 00110 padded => 00110_100 = 0x34
     const siPadded = padBits(5, Buffer.from([0b00110000]));
     const siHash   = cellHash(5, siPadded, [
-        { depth: CODE_DEPTH, hash: CODE_HASH },
+        { depth: code.depth, hash: code.hash },
         { depth: dataDepth,  hash: dataHash  },
     ]);
 
@@ -197,6 +216,80 @@ function walletV4Address(pubkey, workchain = 0) {
     return addr.toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
 }
 
+/**
+ * Derive a WalletV3R2 address from a 32-byte Ed25519 public key.
+ * Returns a bounceable, URL-safe base64 string (48 chars).
+ */
+function walletV3R2Address(pubkey, workchain = 0) {
+    // ---- Data cell: seqno(32) | subwallet_id(32) | pubkey(256) = 320 bits (byte-aligned) ----
+    const dataBuf = Buffer.alloc(40, 0);
+    dataBuf.writeUInt32BE(0,                                   0);  // seqno
+    dataBuf.writeUInt32BE(DEFAULT_SUBWALLET_ID + workchain,    4);  // subwallet_id
+    dataBuf.set(pubkey, 8);                                         // 32 bytes public key
+    return stateInitAddress(WALLET_CODE.v3r2, 320, dataBuf, workchain);
+}
+
+/**
+ * Derive a WalletV4R2 address from a 32-byte Ed25519 public key.
+ * Returns a bounceable, URL-safe base64 string (48 chars).
+ */
+function walletV4Address(pubkey, workchain = 0) {
+    // ---- Data cell: seqno(32) | subwallet_id(32) | pubkey(256) | has_plugins(1) ----
+    // Total = 321 bits; has_plugins = 0, padBits() sets the trailing "1" completion bit.
+    const dataBuf = Buffer.alloc(41, 0);
+    dataBuf.writeUInt32BE(0,                                   0);  // seqno
+    dataBuf.writeUInt32BE(DEFAULT_SUBWALLET_ID + workchain,    4);  // subwallet_id
+    dataBuf.set(pubkey, 8);                                         // 32 bytes public key
+    return stateInitAddress(WALLET_CODE.v4r2, 321, dataBuf, workchain);
+}
+
+/**
+ * Derive a WalletV5R1 (W5) address from a 32-byte Ed25519 public key.
+ * Returns a bounceable, URL-safe base64 string (48 chars).
+ */
+function walletV5R1Address(pubkey, workchain = 0) {
+    // wallet_id = client_context XOR network_global_id, both as int32.
+    // client_context = 1 | workchain:int8 | wallet_version:uint8 (0 = v5r1) | subwallet_number:uint15 (0)
+    const context  = (0x80000000 | ((workchain & 0xff) << 23)) >>> 0;
+    const walletId = (context ^ V5R1_NETWORK_GLOBAL_ID) >>> 0;
+
+    // ---- Data cell: is_signature_allowed(1) | seqno(32) | wallet_id(32) | pubkey(256) | extensions(1) ----
+    // Total = 322 bits. Everything after the leading "1" bit is shifted right by one bit,
+    // so assemble the byte-aligned tail first and then shift it into place.
+    const tail = Buffer.alloc(40, 0);
+    tail.writeUInt32BE(0,        0);  // seqno
+    tail.writeUInt32BE(walletId, 4);  // wallet_id
+    tail.set(pubkey, 8);              // 32 bytes public key
+
+    const dataBuf = Buffer.alloc(41, 0);
+    dataBuf[0] = 0x80;                // is_signature_allowed = 1
+    for (let i = 0; i < 40; i++) {
+        dataBuf[i]     |= tail[i] >> 1;
+        dataBuf[i + 1] |= (tail[i] & 0x01) << 7;
+    }
+    // Bit 321 (extensions dict = empty) is already 0; padBits() adds the completion bit after it.
+    return stateInitAddress(WALLET_CODE.v5r1, 322, dataBuf, workchain);
+}
+
+const WALLET_ADDRESS_BY_VERSION = {
+    v3r2: walletV3R2Address,
+    v4r2: walletV4Address,
+    v5r1: walletV5R1Address,
+};
+
+/**
+ * Derive the address for a given wallet version. Different versions produce
+ * different addresses from the same key — the version must match the wallet
+ * software the mnemonic will be imported into.
+ */
+function walletAddress(version, pubkey, workchain = 0) {
+    const derive = WALLET_ADDRESS_BY_VERSION[version];
+    if (!derive) {
+        throw new Error(`Unsupported wallet version: ${JSON.stringify(version)}`);
+    }
+    return derive(pubkey, workchain);
+}
+
 // ---------------------------------------------------------------------------
 // TonWalletFinder
 // ---------------------------------------------------------------------------
@@ -209,9 +302,9 @@ const MAX_TARGET_LENGTH = 46;
 // Transient errors are retried; a persistent one must not spin forever.
 const MAX_CONSECUTIVE_ERRORS = 5;
 
-// Only wallet version implemented so far; validated eagerly so a typo fails at
-// construction time instead of producing an address for the wrong wallet.
-const SUPPORTED_WALLET_VERSIONS = ['v4r2'];
+// Validated eagerly so a typo fails at construction time instead of producing
+// an address for the wrong wallet.
+const SUPPORTED_WALLET_VERSIONS = Object.keys(WALLET_ADDRESS_BY_VERSION);
 
 class TonWalletFinder {
     /**
@@ -223,8 +316,9 @@ class TonWalletFinder {
      * @param {boolean} [options.saveResult=false]   - Save result to ton_wallet_results.txt
      * @param {number|'auto'} [options.workers=1]    - Default worker count for `findWalletWithEnding()`;
      *        overridable per call. See `findWalletWithEnding` for the accepted values.
-     * @param {'v4r2'} [options.walletVersion='v4r2'] - TON wallet contract version to derive
-     *        the address for. Currently only `'v4r2'` is supported.
+     * @param {'v3r2'|'v4r2'|'v5r1'} [options.walletVersion='v4r2'] - TON wallet contract
+     *        version to derive the address for. Different versions give different addresses
+     *        for the same mnemonic.
      */
     constructor(targetEnding, options = {}) {
         // Dash at end of character class avoids ambiguous range
@@ -268,11 +362,11 @@ class TonWalletFinder {
         return { keyPair, words };
     }
 
-    // Derive a WalletV4 address from a key pair.
+    // Derive the wallet address (for this.walletVersion) from a key pair.
     // Returns an address object with a .toString() method — same interface as
     // the original @ton/core Address so callers are unaffected.
     createWallet(keyPair) {
-        const str = walletV4Address(Buffer.from(keyPair.publicKey));
+        const str = walletAddress(this.walletVersion, Buffer.from(keyPair.publicKey));
         return { toString: () => str };
     }
 
@@ -362,7 +456,11 @@ class TonWalletFinder {
             if (signal) { signal.addEventListener('abort', onAbort, { once: true }); }
 
             for (let i = 0; i < count; i++) {
-                const w = this._createWorker({ targetEnding: this.targetEnding, showProcess: this.showProcess });
+                const w = this._createWorker({
+                    targetEnding:  this.targetEnding,
+                    showProcess:   this.showProcess,
+                    walletVersion: this.walletVersion,
+                });
                 workers.push(w);
 
                 w.on('message', msg => {
@@ -518,7 +616,10 @@ module.exports._internals = {
     mnemonicNew,
     mnemonicToPrivateKey,
     isBasicSeed,
+    walletAddress,
+    walletV3R2Address,
     walletV4Address,
+    walletV5R1Address,
     cellHash,
     padBits,
     crc16,

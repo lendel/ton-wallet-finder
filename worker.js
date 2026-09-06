@@ -12,12 +12,12 @@
 const { parentPort, workerData, isMainThread } = require('worker_threads');
 const { _internals } = require('./index');
 
-const { mnemonicNew, mnemonicToPrivateKey, walletV4Address } = _internals;
+const { mnemonicNew, mnemonicToPrivateKey, walletAddress } = _internals;
 
 // Same policy as the single-threaded loop in index.js.
 const MAX_CONSECUTIVE_ERRORS = 5;
 
-async function searchLoop({ targetEnding, showProcess }) {
+async function searchLoop({ targetEnding, showProcess, walletVersion }) {
     let consecutiveErrors = 0;
     while (true) {
         let keyPair;
@@ -26,7 +26,7 @@ async function searchLoop({ targetEnding, showProcess }) {
         try {
             words   = await mnemonicNew();
             keyPair = await mnemonicToPrivateKey(words);
-            address = walletV4Address(keyPair.publicKey);
+            address = walletAddress(walletVersion, keyPair.publicKey);
             consecutiveErrors = 0;
         } catch (err) {
             consecutiveErrors++;
