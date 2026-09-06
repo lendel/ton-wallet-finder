@@ -22,7 +22,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   8-core estimates.
 
 ### Changed
+- CI matrix now covers Node.js 20, 22, 24 and 26; the publish workflow runs on Node.js 24
+  (Active LTS). Node.js 20 reached end-of-life on 2026-04-30 and remains supported only until
+  the next major release; README and CONTRIBUTING say so.
+- `npm run lint` now also lints `worker.js`.
+- `_internals` is declared in `index.d.ts`; `walletV4Address` and `cellHash` accept any
+  `Uint8Array`, not only `Buffer`.
 - Release process documented in CONTRIBUTING (tag-driven publish, trusted publishing).
+
+### Documentation
+- README: `saveResultsToFile`, `createKeyPair`, `createWallet` and `_internals` documented;
+  cancellation errors described (`name: 'AbortError'`, `cause`); retry limit described;
+  `targetEnding` length limit added to the options table; ES-module example added to the
+  Russian section; the checksum is correctly named CRC-16/XMODEM (not CRC-16/CCITT); the
+  migration table distinguishes the v3 and 4.0.1 return types of `saveResultsToFile`.
+- The "network access" scanner note in the README no longer blames the funding links; the
+  stale lock file that listed `axios` was the more likely cause and is gone since 4.0.1.
 
 ---
 
@@ -73,6 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CONTRIBUTING now states Node.js 20 (matches `engines`) and points to `SECURITY.md`.
 - Removed `.npmignore` (ineffective and misleading while `files` is set).
 - `publish.yml`: least-privilege `permissions` on the test job.
+
+### Infrastructure
+- OpenSSF Scorecard workflow (weekly and on push to `master`), all actions pinned to
+  verified commit SHAs; badge in README.
 
 ---
 

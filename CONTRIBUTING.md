@@ -12,7 +12,9 @@ cd ton-wallet-finder
 npm install
 ```
 
-**Requirements:** Node.js 20 or higher (matches `engines` in `package.json`).
+**Requirements:** Node.js 20 or higher (matches `engines` in `package.json`). Develop on
+Node.js 22 or 24 (LTS); CI runs the suite on 20, 22, 24 and 26. Node.js 20 is end-of-life
+(30 April 2026) and is kept only until the next major release.
 
 ---
 
@@ -21,7 +23,7 @@ npm install
 | Command | Description |
 |---------|-------------|
 | `npm test` | Run the full test suite (Mocha) |
-| `npm run lint` | Run ESLint on `index.js` and `test/` |
+| `npm run lint` | Run ESLint on `index.js`, `worker.js` and `test/` |
 
 ---
 
@@ -35,7 +37,14 @@ npm install
 
 ## Testing
 
-Tests live in `test/TonWalletFinder.test.js` (Mocha + Chai + Sinon).
+Tests live in `test/` (Mocha + Chai + Sinon):
+
+| File | Covers |
+|------|--------|
+| `TonWalletFinder.test.js` | Constructor validation, single-threaded search, cancellation, `saveResultsToFile` |
+| `workers.test.js` | Worker-thread pool (deterministic fake workers + real-thread integration) |
+| `crypto.test.js` | Reference vectors for mnemonic → key → address, `cellHash`, `padBits`, `crc16` |
+| `esm.test.mjs` | Package is importable from ES modules through the `exports` map |
 
 - Every new feature or bug fix must include a corresponding test
 - All stubs must be restored (use `try/finally` with `stub.restore()`)
@@ -43,7 +52,7 @@ Tests live in `test/TonWalletFinder.test.js` (Mocha + Chai + Sinon).
 
 ### Dev-dependency note: Chai v4
 
-`chai` is intentionally pinned to `^4.x` and **must not be upgraded to v5+**.
+`chai` is intentionally pinned to `4.3.7` and **must not be upgraded to v5+**.
 Chai v5 dropped CommonJS support. Since this package is a pure CJS library and does not use ESM, upgrading chai would break the test suite without any benefit.
 
 ### Reference vectors
@@ -87,7 +96,7 @@ Releases are published by CI only (`.github/workflows/publish.yml`), never from 
    ```sh
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-3. The workflow runs lint + tests, then `npm publish --provenance`.
+3. The workflow runs lint + tests on Node.js 24, then `npm publish --provenance`.
 
 The workflow currently authenticates with the `NPM_TOKEN` repository secret. The
 recommended setup is npm **trusted publishing** (OIDC, no long-lived token): on

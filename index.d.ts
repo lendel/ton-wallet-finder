@@ -130,3 +130,32 @@ export declare function saveResultsToFile(
     walletAddress: string,
     fileName?: string
 ): Promise<string | undefined>;
+
+/**
+ * Ed25519 key pair in tweetnacl layout: 32-byte public key and 64-byte secret key (seed ‖ publicKey).
+ */
+export interface Ed25519KeyPair {
+    readonly publicKey: Uint8Array;
+    readonly secretKey: Uint8Array;
+}
+
+/**
+ * Low-level primitives behind `TonWalletFinder`, exposed for testing and advanced use.
+ * Not yet covered by semver guarantees — signatures may change in a minor release.
+ */
+export declare const _internals: {
+    /** Generate a fresh 24-word TON mnemonic (passes the TON seed-version check). */
+    mnemonicNew(): Promise<string[]>;
+    /** Derive the Ed25519 key pair from a TON mnemonic (no password). */
+    mnemonicToPrivateKey(words: readonly string[]): Promise<Ed25519KeyPair>;
+    /** TON "basic seed" check — `true` if the mnemonic is valid without a password. */
+    isBasicSeed(words: readonly string[]): Promise<boolean>;
+    /** Bounceable, URL-safe WalletV4R2 address for a 32-byte public key. */
+    walletV4Address(publicKey: Uint8Array, workchain?: number): string;
+    /** TVM representation hash (SHA-256) of an ordinary cell. */
+    cellHash(bitsCount: number, bitsBytes: Uint8Array, refs: ReadonlyArray<{ depth: number; hash: Uint8Array }>): Uint8Array;
+    /** TVM bit padding: sets the completion bit after `bitsCount` data bits. */
+    padBits(bitsCount: number, bitsBytes: Uint8Array): Uint8Array;
+    /** CRC-16/XMODEM (poly 0x1021, init 0), as used in TON user-friendly addresses. */
+    crc16(data: Uint8Array): number;
+};

@@ -118,14 +118,14 @@ function cellHash(bitsCount, bitsBytes, refs) {
 
     repr[cur++] = d1;
     repr[cur++] = d2;
-    bitsBytes.copy(repr, cur);  cur += dataLen;
+    repr.set(bitsBytes.subarray(0, dataLen), cur);  cur += dataLen;
 
     for (const r of refs) {
         repr[cur++] = (r.depth >> 8) & 0xff;
         repr[cur++] =  r.depth       & 0xff;
     }
     for (const r of refs) {
-        r.hash.copy(repr, cur);  cur += 32;
+        repr.set(r.hash, cur);  cur += 32;
     }
     return crypto.createHash('sha256').update(repr).digest();
 }
@@ -172,7 +172,7 @@ function walletV4Address(pubkey, workchain = 0) {
     const dataBuf = Buffer.alloc(41, 0);
     dataBuf.writeUInt32BE(0,           0);  // seqno
     dataBuf.writeUInt32BE(subwalletId, 4);  // subwallet_id
-    pubkey.copy(dataBuf, 8);                // 32 bytes public key
+    dataBuf.set(pubkey, 8);                 // 32 bytes public key
     const dataHash  = cellHash(321, padBits(321, dataBuf), []);
     const dataDepth = 0;
 

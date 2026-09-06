@@ -63,6 +63,11 @@ describe('crypto primitives (reference vectors)', () => {
             expect(addr).to.equal(VECTOR.address);
         });
 
+        it('should accept a plain Uint8Array public key (not only Buffer)', () => {
+            const plain = new Uint8Array(Buffer.from(VECTOR.publicKey, 'hex'));
+            expect(walletV4Address(plain)).to.equal(VECTOR.address);
+        });
+
         it('should produce a 48-char base64url string with no padding', () => {
             const addr = walletV4Address(Buffer.alloc(32, 7));
             expect(addr).to.match(/^[A-Za-z0-9_-]{48}$/);
