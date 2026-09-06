@@ -77,40 +77,12 @@ wallet software the user will actually import the mnemonic into).
 
 ## Backlog — not yet scheduled
 
-### Multisig support
-
-Real interest, but a different shape of feature than the above, for one structural
-reason: every address this library derives today comes from **one** generated
-mnemonic. A TON multisig (v2) address is derived from a *list* of owner public
-keys plus a signature threshold — the address isn't a function of a single key at
-all. "Vanity search" only makes sense here if you fix everyone else's public key
-and vary the mnemonic at *your* owner slot:
-
-```js
-new TonWalletFinder(targetEnding, {
-  walletVersion: 'multisig-v2',
-  multisig: {
-    owners: [pubkeyHex, pubkeyHex, ...],  // fixed, supplied by the caller
-    threshold: k,
-    yourOwnerIndex: i,                     // the slot findWalletWithEnding() searches
-  },
-})
-```
-
-The blocking technical gap: a TON multisig's init data embeds the owner list as a
-TVM dictionary (`HashmapE`), and this project has no dictionary/Patricia-trie cell
-serializer — `cellHash`/`padBits` today only handle flat, ref-based cells. Building
-and verifying a from-scratch `HashmapE` encoder, without pulling in `@ton/core`, is
-a meaningfully bigger and riskier piece of work than wallet-version selection, and
-it's the kind of code where a subtle bug produces a plausible-looking but wrong
-address — the worst possible failure mode for this library.
-
-**Before this gets a version number:** a standalone spike that (a) hand-encodes a
-small owner dictionary, (b) checks the resulting address against a real multisig
-deployed via `@ton/ton` or the reference multisig CLI, and (c) reports back
-honestly on how much of the effort that turned out to be. Don't commit v5.x/v6.0.0
-to "ships multisig" until that spike says it's tractable at the zero-dependency
-bar the rest of the library holds to.
+Multisig support was considered and dropped: every address this library derives
+today comes from one generated mnemonic, while a TON multisig address is derived
+from a list of owner public keys plus a threshold, and building that (a TVM
+`HashmapE` dictionary encoder, from scratch, at the zero-dependency bar the rest
+of the library holds to) is a different and much larger project than this one.
+Not planned.
 
 ### Smaller open item
 
