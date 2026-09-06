@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.1.0] — 2026-09-06
+
+### Added
+- **Parallel search.** `findWalletWithEnding({ workers })` runs the search on N
+  `worker_threads` (`'auto'` = one per CPU core) and resolves with the first match; all
+  workers are terminated on match, abort or error. Throughput scales almost linearly with
+  cores. Default stays `1` (single-threaded, unchanged behaviour). Ships as `worker.js`.
+- `FindOptions.workers` in `index.d.ts`; README performance table now shows 1-core and
+  8-core estimates.
+
+### Changed
+- Release process documented in CONTRIBUTING (tag-driven publish, trusted publishing).
+
+---
+
 ## [4.0.1] — 2026-09-06
 
 ### Fixed

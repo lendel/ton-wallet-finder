@@ -1,6 +1,6 @@
 {
   "name": "ton-wallet-finder",
-  "version": "4.0.1",
+  "version": "4.1.0",
   "description": "Vanity address generator for TON blockchain — find a WalletV4 address ending with any custom string.",
   "main": "index.js",
   "exports": {
@@ -17,7 +17,8 @@
     "wordlist.js",
     "index.d.ts",
     "CHANGELOG.md",
-    "Readme.md"
+    "Readme.md",
+    "worker.js"
   ],
   "sideEffects": false,
   "scripts": {

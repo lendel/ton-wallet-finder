@@ -116,6 +116,19 @@ try {
 }
 ```
 
+**Parallel search** — pass `workers` to use several CPU cores. Throughput scales almost
+linearly with the number of cores:
+
+```javascript
+// one worker thread per CPU core
+const result = await finder.findWalletWithEnding({ workers: 'auto' });
+
+// or an explicit count
+const result = await finder.findWalletWithEnding({ workers: 4 });
+```
+
+`workers` defaults to `1` (single-threaded, same behaviour as before). It can be combined with `signal`.
+
 TypeScript declarations are included (`index.d.ts`).
 
 ---
@@ -126,17 +139,17 @@ Search time grows exponentially with ending length: on average **64ⁿ** candida
 *n*-character ending. Each candidate is expensive by design — a TON mnemonic requires
 about 256 PBKDF2 seed-version checks plus one 100 000-iteration PBKDF2, roughly
 200 000 HMAC-SHA-512 rounds per address. Measured throughput is about **5 addresses per
-second per CPU core** (single-threaded; the library currently uses one core).
+second per CPU core**.
 
-| Ending length | Attempts (avg) | Time at ~5 addr/s |
-|--------------|----------------|-------------------|
-| 1 char | 64 | ~12 seconds |
-| 2 chars | 4 096 | ~13 minutes |
-| 3 chars | 262 144 | ~14 hours |
-| 4 chars | 16 777 216 | ~5 weeks |
+| Ending length | Attempts (avg) | 1 core | 8 cores (`workers: 'auto'`) |
+|--------------|----------------|--------|------------------------------|
+| 1 char | 64 | ~12 seconds | ~2 seconds |
+| 2 chars | 4 096 | ~13 minutes | ~2 minutes |
+| 3 chars | 262 144 | ~14 hours | ~2 hours |
+| 4 chars | 16 777 216 | ~5 weeks | ~5 days |
 
-Estimate: `time ≈ 64ⁿ / 5` seconds. Individual runs vary widely (the attempt count is
-geometrically distributed), so treat these as medians, not guarantees.
+Estimate: `time ≈ 64ⁿ / (5 × cores)` seconds. Individual runs vary widely (the attempt
+count is geometrically distributed), so treat these as medians, not guarantees.
 
 > The TON address alphabet is base64url (A–Z, a–z, 0–9, `-`, `_`), so each character position has **64** possible values.
 
@@ -293,6 +306,19 @@ try {
 }
 ```
 
+**Параллельный поиск** — опция `workers` задействует несколько ядер CPU. Скорость растёт
+почти линейно с числом ядер:
+
+```javascript
+// по одному потоку на ядро
+const result = await finder.findWalletWithEnding({ workers: 'auto' });
+
+// или явное число
+const result = await finder.findWalletWithEnding({ workers: 4 });
+```
+
+По умолчанию `workers: 1` (один поток, прежнее поведение). Сочетается с `signal`.
+
 Поставляется с декларациями TypeScript (`index.d.ts`).
 
 ### Производительность
@@ -301,16 +327,16 @@ try {
 окончания из *n* символов. Каждый кандидат дорог по самой природе TON-мнемоники: около
 256 проверок seed-версии через PBKDF2 плюс один PBKDF2 на 100 000 итераций, то есть
 порядка 200 000 раундов HMAC-SHA-512 на один адрес. Измеренная скорость — около
-**5 адресов в секунду на одно ядро** (библиотека пока работает в одном потоке).
+**5 адресов в секунду на одно ядро**.
 
-| Длина окончания | Попыток (в среднем) | Время при ~5 адр/с |
-|----------------|---------------------|--------------------|
-| 1 символ | 64 | ~12 секунд |
-| 2 символа | 4 096 | ~13 минут |
-| 3 символа | 262 144 | ~14 часов |
-| 4 символа | 16 777 216 | ~5 недель |
+| Длина окончания | Попыток (в среднем) | 1 ядро | 8 ядер (`workers: 'auto'`) |
+|----------------|---------------------|--------|-----------------------------|
+| 1 символ | 64 | ~12 секунд | ~2 секунды |
+| 2 символа | 4 096 | ~13 минут | ~2 минуты |
+| 3 символа | 262 144 | ~14 часов | ~2 часа |
+| 4 символа | 16 777 216 | ~5 недель | ~5 дней |
 
-Оценка: `время ≈ 64ⁿ / 5` секунд. Разброс между запусками большой (число попыток
+Оценка: `время ≈ 64ⁿ / (5 × ядра)` секунд. Разброс между запусками большой (число попыток
 распределено геометрически), поэтому это медианы, а не гарантии.
 
 ### Что нового в v4

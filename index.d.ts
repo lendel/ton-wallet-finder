@@ -23,6 +23,13 @@ export interface FindOptions {
      * or `'Wallet search aborted'`, and whose `cause` is the original `signal.reason`.
      */
     readonly signal?: AbortSignal;
+
+    /**
+     * Number of worker threads to search on in parallel, or `'auto'` for one per
+     * available CPU core. Default: `1` (single-threaded, on the main thread).
+     * Throughput scales almost linearly with the number of cores.
+     */
+    readonly workers?: number | 'auto';
 }
 
 /**
@@ -41,6 +48,11 @@ export interface FindOptions {
  * const controller = new AbortController();
  * setTimeout(() => controller.abort(), 30_000); // cancel after 30 s
  * const result = await finder.findWalletWithEnding({ signal: controller.signal });
+ * ```
+ *
+ * @example Parallel search on all CPU cores
+ * ```js
+ * const result = await finder.findWalletWithEnding({ workers: 'auto' });
  * ```
  */
 export declare class TonWalletFinder {
@@ -84,7 +96,8 @@ export declare class TonWalletFinder {
 
     /**
      * Continuously generates random wallets until one whose address ends with `targetEnding` is found.
-     * Pass `options.signal` to cancel the search at any time.
+     * Pass `options.signal` to cancel the search at any time and `options.workers`
+     * to search on several threads in parallel.
      *
      * Transient key-generation errors are retried; after 5 consecutive failures the
      * promise rejects with an Error whose `cause` is the last failure.

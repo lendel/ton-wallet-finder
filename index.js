@@ -2,7 +2,9 @@
 
 const crypto = require('crypto');
 const fs     = require('fs');
+const os     = require('os');
 const path   = require('path');
+const { Worker } = require('worker_threads');
 
 const WORDLIST = require('./wordlist');
 
@@ -250,13 +252,25 @@ class TonWalletFinder {
      * Search for a wallet whose address ends with `this.targetEnding`.
      * The comparison is case-sensitive.
      *
-     * @param {object}      [options={}]    - Optional configuration.
-     * @param {AbortSignal} [options.signal] - Optional AbortSignal to cancel the search.
+     * @param {object}      [options={}]     - Optional configuration.
+     * @param {AbortSignal} [options.signal]  - Optional AbortSignal to cancel the search.
+     * @param {number|'auto'} [options.workers=1] - Number of worker threads to search in
+     *        parallel. `'auto'` uses every available CPU core. `1` (default) searches on the
+     *        main thread exactly as before.
      * @returns {Promise<{ publicKey: string, privateKey: string, words: string[], walletAddress: string }>}
      */
     async findWalletWithEnding(options = {}) {
         // Safe destructure — works correctly for both undefined and null
-        const { signal } = options !== null ? options : {};
+        const { signal, workers = 1 } = options !== null ? options : {};
+
+        const workerCount = resolveWorkerCount(workers);
+
+        if (signal?.aborted) { throw abortErrorFrom(signal); }
+
+        if (workerCount > 1) {
+            const { keyPair, words, walletAddress } = await this._searchWithWorkers(workerCount, signal);
+            return this._finish(keyPair, words, walletAddress);
+        }
 
         let keyPair;
         let words;
@@ -268,15 +282,7 @@ class TonWalletFinder {
         // Search loop — generates wallets until the address suffix matches
         do {
             // Honour cancellation at the start of every iteration
-            if (signal?.aborted) {
-                const reason  = signal.reason;
-                const message = typeof reason === 'string'
-                    ? reason
-                    : reason?.message ?? 'Wallet search aborted';
-                const abortError = new Error(message, { cause: reason });
-                abortError.name = 'AbortError';
-                throw abortError;
-            }
+            if (signal?.aborted) { throw abortErrorFrom(signal); }
 
             try {
                 ({ keyPair, words } = await this.createKeyPair());
@@ -300,6 +306,74 @@ class TonWalletFinder {
             found = walletAddress.endsWith(this.targetEnding);
         } while (!found);
 
+        return this._finish(keyPair, words, walletAddress);
+    }
+
+    /**
+     * Run the search on `count` worker threads and resolve with the first match.
+     * All workers are terminated as soon as one finds a match, on abort, or on error.
+     * @private
+     */
+    _searchWithWorkers(count, signal) {
+        return new Promise((resolve, reject) => {
+            const workers = [];
+            let settled = false;
+
+            const shutdown = () => {
+                for (const w of workers) { w.terminate().catch(() => {}); }
+                if (signal) { signal.removeEventListener('abort', onAbort); }
+            };
+            const settle = (fn, value) => {
+                if (settled) { return; }
+                settled = true;
+                shutdown();
+                fn(value);
+            };
+            const onAbort = () => settle(reject, abortErrorFrom(signal));
+
+            if (signal) { signal.addEventListener('abort', onAbort, { once: true }); }
+
+            for (let i = 0; i < count; i++) {
+                const w = this._createWorker({ targetEnding: this.targetEnding, showProcess: this.showProcess });
+                workers.push(w);
+
+                w.on('message', msg => {
+                    if (settled) { return; }
+                    if (msg.type === 'trying') {
+                        console.log('Trying address:', msg.address);
+                    } else if (msg.type === 'found') {
+                        settle(resolve, {
+                            keyPair:       { publicKey: Buffer.from(msg.publicKey), secretKey: Buffer.from(msg.secretKey) },
+                            words:         msg.words,
+                            walletAddress: msg.address,
+                        });
+                    } else if (msg.type === 'error') {
+                        settle(reject, new Error(msg.message));
+                    }
+                });
+                w.on('error', err => settle(reject, err));
+                w.on('exit', code => {
+                    if (!settled && code !== 0) {
+                        settle(reject, new Error(`Search worker exited unexpectedly with code ${code}`));
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Spawn one search worker. Separated so tests can substitute a fake.
+     * @private
+     */
+    _createWorker(workerData) {
+        return new Worker(path.join(__dirname, 'worker.js'), { workerData });
+    }
+
+    /**
+     * Shared tail of the search: format keys, optionally log and save.
+     * @private
+     */
+    async _finish(keyPair, words, walletAddress) {
         // Format keys as hex strings
         const publicKey  = Buffer.from(keyPair.publicKey).toString('hex');
         const privateKey = Buffer.from(keyPair.secretKey).toString('hex');
@@ -317,6 +391,33 @@ class TonWalletFinder {
 
         return { publicKey, privateKey, words, walletAddress };
     }
+}
+
+/**
+ * Build the error thrown when a search is cancelled through an AbortSignal.
+ * `name` is 'AbortError' (platform convention) and `cause` is the original reason.
+ */
+function abortErrorFrom(signal) {
+    const reason  = signal.reason;
+    const message = typeof reason === 'string'
+        ? reason
+        : reason?.message ?? 'Wallet search aborted';
+    const abortError = new Error(message, { cause: reason });
+    abortError.name = 'AbortError';
+    return abortError;
+}
+
+/**
+ * Validate the `workers` option: a positive integer, or 'auto' for one per CPU core.
+ */
+function resolveWorkerCount(workers) {
+    if (workers === 'auto') {
+        return typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length;
+    }
+    if (!Number.isInteger(workers) || workers < 1) {
+        throw new RangeError(`Invalid workers option: expected a positive integer or 'auto', got ${JSON.stringify(workers)}`);
+    }
+    return workers;
 }
 
 // Upper bound on "name-2.txt", "name-3.txt", … fallbacks before giving up.

@@ -78,6 +78,25 @@ Breaking changes include: changing parameter defaults, changing return types, re
 
 ---
 
+## Release Process
+
+Releases are published by CI only (`.github/workflows/publish.yml`), never from a laptop.
+
+1. Merge the release PR into `master` (version bumped in `package.json`, `CHANGELOG.md` updated).
+2. Tag and push:
+   ```sh
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   ```
+3. The workflow runs lint + tests, then `npm publish --provenance`.
+
+The workflow currently authenticates with the `NPM_TOKEN` repository secret. The
+recommended setup is npm **trusted publishing** (OIDC, no long-lived token): on
+npmjs.com open the package → Settings → Trusted publisher, and register
+`lendel/ton-wallet-finder` with workflow `publish.yml`. Once that is configured the
+`NODE_AUTH_TOKEN` line can be removed from `publish.yml` and the secret deleted.
+
+---
+
 ## Security
 
 See [SECURITY.md](SECURITY.md). Please do not report vulnerabilities in public issues.
