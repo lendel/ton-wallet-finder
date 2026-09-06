@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `_internals` is declared in `index.d.ts`; `walletV4Address` and `cellHash` accept any
   `Uint8Array`, not only `Buffer`.
 - Release process documented in CONTRIBUTING (tag-driven publish, trusted publishing).
+- `publish.yml` switched to npm **trusted publishing** (OIDC): the `NPM_TOKEN` secret is
+  no longer used (npm now rejects direct publishing with tokens that bypass 2FA). The
+  workflow also verifies that the pushed tag matches `package.json` and can be started
+  manually (`workflow_dispatch`).
 
 ### Documentation
 - README: `saveResultsToFile`, `createKeyPair`, `createWallet` and `_internals` documented;

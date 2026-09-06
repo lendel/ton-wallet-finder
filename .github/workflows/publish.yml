@@ -1,9 +1,13 @@
 name: Publish to npm
 
+# Publishes with npm Trusted Publishing (OIDC): no long-lived token, provenance
+# attached automatically. The package must have this repository + workflow file
+# registered as a trusted publisher on npmjs.com (see CONTRIBUTING.md).
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:   # manual re-run from the Actions tab if a tagged run failed
 
 jobs:
   test:
@@ -30,19 +34,27 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write  # for npm provenance
+      id-token: write  # OIDC token for npm trusted publishing + provenance
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
         with:
-          node-version: 24.x
+          node-version: 24.x   # bundles npm >= 11.5.1, required for trusted publishing
           cache: "npm"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Check that the tag matches package.json
+        if: github.ref_type == 'tag'
+        run: |
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "$PKG" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG"
+            exit 1
+          fi
 
       - run: npm ci
 
       - name: Publish
+        # No NODE_AUTH_TOKEN on purpose: npm authenticates through the OIDC token.
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
