@@ -20,6 +20,7 @@ const nodeGlobals = {
     process:         'readonly',
     Buffer:          'readonly',
     console:         'readonly',
+    __dirname:       'readonly',
     AbortController: 'readonly',
     AbortSignal:     'readonly',
     setTimeout:      'readonly',
@@ -37,7 +38,7 @@ const mochaGlobals = {
 
 module.exports = [
     {
-        files: ['index.js', 'eslint.config.js'],
+        files: ['index.js', 'worker.js', 'eslint.config.js'],
         languageOptions: {
             ecmaVersion: 2022,
             sourceType:  'commonjs',
