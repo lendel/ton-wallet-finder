@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [5.1.1] — 2026-09-06
+
+### Fixed
+- `require('ton-wallet-finder/package.json')` (and the ESM equivalent) failed with
+  `ERR_PACKAGE_PATH_NOT_EXPORTED` because the `exports` map only listed `"."`. The map now
+  also exposes `./package.json`, which bundlers, version checkers and other tooling read.
+  No other subpath is exported; the public API is unchanged.
+
+---
+
 ## [5.1.0] — 2026-09-06
 
 ### Added
