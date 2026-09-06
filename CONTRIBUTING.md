@@ -96,13 +96,28 @@ Releases are published by CI only (`.github/workflows/publish.yml`), never from 
    ```sh
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-3. The workflow runs lint + tests on Node.js 24, then `npm publish --provenance`.
+3. The workflow checks that the tag matches `package.json`, runs lint + tests on
+   Node.js 24, then `npm publish --provenance`.
 
-The workflow currently authenticates with the `NPM_TOKEN` repository secret. The
-recommended setup is npm **trusted publishing** (OIDC, no long-lived token): on
-npmjs.com open the package → Settings → Trusted publisher, and register
-`lendel/ton-wallet-finder` with workflow `publish.yml`. Once that is configured the
-`NODE_AUTH_TOKEN` line can be removed from `publish.yml` and the secret deleted.
+### Authentication: npm trusted publishing (OIDC)
+
+The workflow carries **no npm token**. npm authenticates the GitHub Actions run through
+its OIDC identity, and the provenance attestation is generated automatically. This has to
+be registered once on npmjs.com by a package maintainer:
+
+1. Open <https://www.npmjs.com/package/ton-wallet-finder/access> → **Trusted Publisher**
+   (also under the package's *Settings*).
+2. Choose **GitHub Actions** and enter:
+   - Organization or user: `lendel`
+   - Repository: `ton-wallet-finder`
+   - Workflow filename: `publish.yml`
+   - Environment: leave empty
+3. Delete the old `NPM_TOKEN` repository secret on GitHub — it is no longer used, and
+   npm is phasing out publishing with tokens that bypass 2FA.
+
+If a tagged run failed (for example before the trusted publisher was registered), fix the
+cause and either move the tag to the fixed commit and push it again, or start the
+workflow manually from the *Actions* tab (**Run workflow**) on `master`.
 
 ---
 
