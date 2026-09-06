@@ -19,7 +19,7 @@ Find a wallet whose address ends with any string you choose.
 
 ---
 
-**Security: 0 dependencies, 0 network calls. Verified pure logic. The "Network access" flag in some scanners is a false positive caused by the funding links in package.json.**
+**Security: 0 dependencies, 0 network calls.** The only modules imported are Node.js built-ins (`crypto`, `fs`, `os`, `path`, `worker_threads`) — verify with `grep require index.js worker.js`. Every npm release is published from CI with a provenance attestation.
 
 ---
 
@@ -43,7 +43,7 @@ Find a wallet whose address ends with any string you choose.
 npm install ton-wallet-finder
 ```
 
-> Requires Node.js 20 or higher.
+> Requires Node.js 20 or higher. **Node.js 22 or 24 (LTS) is recommended**: Node.js 20 reached end-of-life on 30 April 2026 and support for it will be dropped in the next major release.
 
 ---
 
@@ -83,7 +83,7 @@ node findWallet.js
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `targetEnding` | `string` | required | Desired address ending. Latin letters, digits, `-`, `_`. **Case-sensitive.** |
+| `targetEnding` | `string` | required | Desired address ending. Latin letters, digits, `-`, `_`, at most 46 characters. **Case-sensitive.** |
 | `showProcess` | `boolean` | `false` | Log each attempted address to console |
 | `showResult` | `boolean` | `false` | Log found wallet details to console. **Keep `false` in shared/logged environments to avoid exposing private keys.** |
 | `saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` in the current working directory. Never overwrites: an existing file gets a `-2`, `-3`, … suffix |
@@ -112,9 +112,14 @@ setTimeout(() => controller.abort('timeout'), 30_000); // cancel after 30 s
 try {
   const result = await finder.findWalletWithEnding({ signal: controller.signal });
 } catch (err) {
-  console.log('Search cancelled:', err.message);
+  if (err.name === 'AbortError') {
+    console.log('Search cancelled:', err.message); // err.cause === signal.reason
+  }
 }
 ```
+
+If key generation fails 5 times in a row (for example, a runtime without Ed25519 support),
+the promise rejects with the last error as `cause` instead of retrying forever.
 
 **Parallel search** — pass `workers` to use several CPU cores. Throughput scales almost
 linearly with the number of cores:
@@ -128,6 +133,25 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 ```
 
 `workers` defaults to `1` (single-threaded, same behaviour as before). It can be combined with `signal`.
+
+### `saveResultsToFile(publicKey, privateKey, words, walletAddress, [fileName]) → Promise<string | undefined>`
+
+Writes the credentials as plain text to `fileName` (default `ton_wallet_results.txt`) in the
+**current working directory**, with file mode `0600`. Never overwrites: if the file exists, a
+numeric suffix is appended (`ton_wallet_results-2.txt`, `-3`, …). Resolves with the absolute
+path of the written file, or `undefined` if writing failed (the error is logged, never thrown).
+`fileName` must be a plain file name — path separators are rejected. This is what
+`saveResult: true` calls internally.
+
+### Lower-level methods
+
+- `finder.createKeyPair()` → `Promise<{ keyPair: { publicKey, secretKey }, words }>` — a fresh
+  24-word TON mnemonic and its Ed25519 key pair.
+- `finder.createWallet(keyPair)` → object whose `toString()` returns the bounceable, URL-safe
+  WalletV4 address (synchronous).
+- `_internals` — the primitives behind the above (`mnemonicNew`, `mnemonicToPrivateKey`,
+  `isBasicSeed`, `walletV4Address`, `cellHash`, `padBits`, `crc16`). Exported for testing and
+  advanced use; not yet covered by semver guarantees.
 
 TypeScript declarations are included (`index.d.ts`).
 
@@ -168,7 +192,7 @@ Starting with v4, everything is implemented using **Node.js built-in modules onl
 | Mnemonic generation | `crypto.randomBytes` + bundled BIP-39 word list |
 | HMAC-SHA-512 / PBKDF2-SHA-512 | `crypto.createHmac` / `crypto.pbkdf2` |
 | Ed25519 key derivation | `crypto.createPrivateKey` with PKCS#8 seed wrapping |
-| WalletV4R2 address | TVM cell hash (SHA-256) + CRC-16/CCITT via `Buffer` |
+| WalletV4R2 address | TVM cell hash (SHA-256) + CRC-16/XMODEM via `Buffer` |
 
 **Result:** `npm install ton-wallet-finder` now installs **0 additional packages**.
 The public API is identical — no code changes required when upgrading from v3.
@@ -183,7 +207,7 @@ The public API is identical — no code changes required when upgrading from v3.
 |---|---|---|
 | `showResult` default | `true` — printed private key to stdout by default | `false` — silent by default |
 | `createWallet()` | returned `Promise<Address>` | returns `Address` synchronously |
-| `saveResultsToFile()` | returned `void` (fire-and-forget) | returns `Promise<string \| undefined>` — the written path (awaited) |
+| `saveResultsToFile()` | returned `void` (fire-and-forget) | v3: `Promise<void>`; 4.0.1+: `Promise<string \| undefined>` — the written path |
 
 ### Migration checklist
 
@@ -251,7 +275,7 @@ Thank you for your support! 💙
 npm install ton-wallet-finder
 ```
 
-> Требуется Node.js 20 или выше.
+> Требуется Node.js 20 или выше. **Рекомендуется Node.js 22 или 24 (LTS)**: поддержка Node.js 20 закончилась 30 апреля 2026 года, и в следующей мажорной версии она будет убрана.
 
 ### Быстрый старт
 
@@ -271,11 +295,17 @@ finder.findWalletWithEnding()
   .catch(console.error);
 ```
 
+ES-модули тоже поддерживаются:
+
+```javascript
+import { TonWalletFinder } from 'ton-wallet-finder';
+```
+
 ### Опции
 
 | Параметр | Тип | По умолчанию | Описание |
 |----------|-----|--------------|----------|
-| `targetEnding` | `string` | обязательный | Желаемое окончание адреса. Латиница, цифры, `-`, `_`. **Регистрозависимо.** |
+| `targetEnding` | `string` | обязательный | Желаемое окончание адреса. Латиница, цифры, `-`, `_`, не более 46 символов. **Регистрозависимо.** |
 | `showProcess` | `boolean` | `false` | Выводить каждый проверяемый адрес в консоль |
 | `showResult` | `boolean` | `false` | Вывести найденный кошелёк в консоль. **Оставьте `false` в окружениях с логированием, чтобы не раскрывать приватный ключ.** |
 | `saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` в текущей рабочей директории. Существующий файл не перезаписывается: добавляется суффикс `-2`, `-3`, … |
@@ -302,9 +332,14 @@ setTimeout(() => controller.abort('таймаут'), 30_000); // отмена ч
 try {
   const result = await finder.findWalletWithEnding({ signal: controller.signal });
 } catch (err) {
-  console.log('Поиск отменён:', err.message);
+  if (err.name === 'AbortError') {
+    console.log('Поиск отменён:', err.message); // err.cause === signal.reason
+  }
 }
 ```
+
+Если генерация ключа падает 5 раз подряд (например, рантайм без поддержки Ed25519),
+промис отклоняется с последней ошибкой в `cause`, а не крутится бесконечно.
 
 **Параллельный поиск** — опция `workers` задействует несколько ядер CPU. Скорость растёт
 почти линейно с числом ядер:
@@ -318,6 +353,25 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 ```
 
 По умолчанию `workers: 1` (один поток, прежнее поведение). Сочетается с `signal`.
+
+#### `saveResultsToFile(publicKey, privateKey, words, walletAddress, [fileName]) → Promise<string | undefined>`
+
+Записывает данные кошелька открытым текстом в `fileName` (по умолчанию `ton_wallet_results.txt`)
+в **текущей рабочей директории** с правами `0600`. Никогда не перезаписывает: если файл существует,
+добавляется числовой суффикс (`ton_wallet_results-2.txt`, `-3`, …). Возвращает абсолютный путь
+записанного файла или `undefined`, если запись не удалась (ошибка логируется, не выбрасывается).
+`fileName` должен быть простым именем файла — разделители пути отклоняются. Именно эту функцию
+вызывает `saveResult: true`.
+
+#### Низкоуровневые методы
+
+- `finder.createKeyPair()` → `Promise<{ keyPair: { publicKey, secretKey }, words }>` — новая
+  24-словная TON-мнемоника и её пара ключей Ed25519.
+- `finder.createWallet(keyPair)` → объект, чей `toString()` возвращает bounceable URL-safe
+  адрес WalletV4 (синхронно).
+- `_internals` — примитивы, на которых всё построено (`mnemonicNew`, `mnemonicToPrivateKey`,
+  `isBasicSeed`, `walletV4Address`, `cellHash`, `padBits`, `crc16`). Экспортированы для тестов и
+  продвинутого использования; пока не покрыты гарантиями semver.
 
 Поставляется с декларациями TypeScript (`index.d.ts`).
 
@@ -352,7 +406,7 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 | Генерация мнемоники | `crypto.randomBytes` + встроенный список BIP-39 |
 | HMAC-SHA-512 / PBKDF2-SHA-512 | `crypto.createHmac` / `crypto.pbkdf2` |
 | Деривация ключа Ed25519 | `crypto.createPrivateKey` с обёрткой PKCS#8 |
-| Адрес WalletV4R2 | Хэш TVM-ячейки (SHA-256) + CRC-16/CCITT через `Buffer` |
+| Адрес WalletV4R2 | Хэш TVM-ячейки (SHA-256) + CRC-16/XMODEM через `Buffer` |
 
 **Результат:** `npm install ton-wallet-finder` устанавливает **0 дополнительных пакетов**.
 Публичный API не изменился — при обновлении с v3 никаких правок в коде не требуется.
@@ -363,7 +417,7 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 |---|---|---|
 | Дефолт `showResult` | `true` | `false` |
 | `createWallet()` | `Promise<Address>` | `Address` (синхронно) |
-| `saveResultsToFile()` | `void` | `Promise<string \| undefined>` — путь к файлу |
+| `saveResultsToFile()` | `void` | v3: `Promise<void>`; 4.0.1+: `Promise<string \| undefined>` — путь к файлу |
 
 </details>
 

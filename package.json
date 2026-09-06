@@ -22,7 +22,7 @@
   ],
   "sideEffects": false,
   "scripts": {
-    "lint": "eslint index.js test/",
+    "lint": "eslint index.js worker.js test/",
     "test": "mocha --recursive"
   },
   "repository": {
