@@ -64,6 +64,12 @@ finder.findWalletWithEnding()
   .catch(console.error);
 ```
 
+ES modules work too:
+
+```javascript
+import { TonWalletFinder } from 'ton-wallet-finder';
+```
+
 Run:
 
 ```sh
@@ -79,7 +85,7 @@ node findWallet.js
 | `targetEnding` | `string` | required | Desired address ending. Latin letters, digits, `-`, `_`. **Case-sensitive.** |
 | `showProcess` | `boolean` | `false` | Log each attempted address to console |
 | `showResult` | `boolean` | `false` | Log found wallet details to console. **Keep `false` in shared/logged environments to avoid exposing private keys.** |
-| `saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` |
+| `saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` in the current working directory. Never overwrites: an existing file gets a `-2`, `-3`, … suffix |
 
 ---
 
@@ -115,14 +121,21 @@ TypeScript declarations are included (`index.d.ts`).
 
 ## Performance
 
-Search time grows exponentially with ending length. Rough estimates on a modern CPU:
+Search time grows exponentially with ending length: on average **64ⁿ** candidates for an
+*n*-character ending. Each candidate is expensive by design — a TON mnemonic requires
+about 256 PBKDF2 seed-version checks plus one 100 000-iteration PBKDF2, roughly
+200 000 HMAC-SHA-512 rounds per address. Measured throughput is about **5 addresses per
+second per CPU core** (single-threaded; the library currently uses one core).
 
-| Ending length | ~Attempts | ~Time |
-|--------------|-----------|-------|
-| 1 char | ~64 | instant |
-| 2 chars | ~4 000 | seconds |
-| 3 chars | ~260 000 | minutes |
-| 4 chars | ~16 000 000 | hours |
+| Ending length | Attempts (avg) | Time at ~5 addr/s |
+|--------------|----------------|-------------------|
+| 1 char | 64 | ~12 seconds |
+| 2 chars | 4 096 | ~13 minutes |
+| 3 chars | 262 144 | ~14 hours |
+| 4 chars | 16 777 216 | ~5 weeks |
+
+Estimate: `time ≈ 64ⁿ / 5` seconds. Individual runs vary widely (the attempt count is
+geometrically distributed), so treat these as medians, not guarantees.
 
 > The TON address alphabet is base64url (A–Z, a–z, 0–9, `-`, `_`), so each character position has **64** possible values.
 
@@ -152,11 +165,11 @@ The public API is identical — no code changes required when upgrading from v3.
 
 ### v2/v3 → v4 breaking changes
 
-| What changed | v2 behaviour | v3 behaviour |
+| What changed | v2 behaviour | v3 / v4 behaviour |
 |---|---|---|
 | `showResult` default | `true` — printed private key to stdout by default | `false` — silent by default |
 | `createWallet()` | returned `Promise<Address>` | returns `Address` synchronously |
-| `saveResultsToFile()` | returned `void` (fire-and-forget) | returns `Promise<void>` (awaited) |
+| `saveResultsToFile()` | returned `void` (fire-and-forget) | returns `Promise<string \| undefined>` — the written path (awaited) |
 
 ### Migration checklist
 
@@ -251,7 +264,7 @@ finder.findWalletWithEnding()
 | `targetEnding` | `string` | обязательный | Желаемое окончание адреса. Латиница, цифры, `-`, `_`. **Регистрозависимо.** |
 | `showProcess` | `boolean` | `false` | Выводить каждый проверяемый адрес в консоль |
 | `showResult` | `boolean` | `false` | Вывести найденный кошелёк в консоль. **Оставьте `false` в окружениях с логированием, чтобы не раскрывать приватный ключ.** |
-| `saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` |
+| `saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` в текущей рабочей директории. Существующий файл не перезаписывается: добавляется суффикс `-2`, `-3`, … |
 
 ### API
 
@@ -283,14 +296,21 @@ try {
 
 ### Производительность
 
-Время поиска растёт экспоненциально с длиной окончания:
+Время поиска растёт экспоненциально с длиной окончания: в среднем **64ⁿ** кандидатов для
+окончания из *n* символов. Каждый кандидат дорог по самой природе TON-мнемоники: около
+256 проверок seed-версии через PBKDF2 плюс один PBKDF2 на 100 000 итераций, то есть
+порядка 200 000 раундов HMAC-SHA-512 на один адрес. Измеренная скорость — около
+**5 адресов в секунду на одно ядро** (библиотека пока работает в одном потоке).
 
-| Длина окончания | ~Попыток | ~Время |
-|----------------|----------|--------|
-| 1 символ | ~64 | мгновенно |
-| 2 символа | ~4 000 | секунды |
-| 3 символа | ~260 000 | минуты |
-| 4 символа | ~16 000 000 | часы |
+| Длина окончания | Попыток (в среднем) | Время при ~5 адр/с |
+|----------------|---------------------|--------------------|
+| 1 символ | 64 | ~12 секунд |
+| 2 символа | 4 096 | ~13 минут |
+| 3 символа | 262 144 | ~14 часов |
+| 4 символа | 16 777 216 | ~5 недель |
+
+Оценка: `время ≈ 64ⁿ / 5` секунд. Разброс между запусками большой (число попыток
+распределено геометрически), поэтому это медианы, а не гарантии.
 
 ### Что нового в v4
 
@@ -316,7 +336,7 @@ try {
 |---|---|---|
 | Дефолт `showResult` | `true` | `false` |
 | `createWallet()` | `Promise<Address>` | `Address` (синхронно) |
-| `saveResultsToFile()` | `void` | `Promise<void>` |
+| `saveResultsToFile()` | `void` | `Promise<string \| undefined>` — путь к файлу |
 
 </details>
 

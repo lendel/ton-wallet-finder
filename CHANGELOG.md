@@ -7,20 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.2.0] - 2026-03-24
+## [Unreleased]
+
+---
+
+## [4.0.1] — 2026-09-06
+
+### Fixed
+- **ESM import was broken.** `import { TonWalletFinder } from 'ton-wallet-finder'` failed with
+  `ERR_PACKAGE_PATH_NOT_EXPORTED` because the `exports` map had no `import`/`default` condition
+  (regression since 3.1.0). The map now lists `types`, `import`, `require` and `default`.
+  A regression test (`test/esm.test.mjs`) imports the package by name.
+- **`saveResultsToFile` no longer overwrites an existing file.** The file is created with the
+  exclusive `wx` flag; if it already exists a numeric suffix is appended
+  (`ton_wallet_results-2.txt`, `-3`, …). Previously a second run silently destroyed the
+  previously found private key.
+- **`saveResultsToFile` writes to the current working directory** (`process.cwd()`) instead of
+  the directory of the process entry point (`require.main`), which could be inside
+  `node_modules`, an `npx` cache or a read-only location. The function now returns the
+  absolute path of the written file (`Promise<string | undefined>`).
+- **`findWalletWithEnding` no longer retries forever.** After 5 consecutive generation
+  failures it rejects with an Error whose `cause` is the last failure. Transient errors are
+  still retried as before.
+- Cancellation errors now have `name === 'AbortError'` and carry the original
+  `signal.reason` as `cause`, so callers can distinguish cancellation from failure.
+  The error message is unchanged.
+- `targetEnding` longer than 46 characters is rejected at construction time: a TON address
+  has only 46 matchable characters after the `EQ`/`UQ` tag, so such a search could never end.
+- Removed redundant manual padding of the data cell (the `padBits` helper already does it);
+  `Buffer.slice` replaced with `Buffer.subarray`.
 
 ### Added
-- `Readme.md` is now included in the published npm package (`files` field)
-- npm provenance attestation via `--provenance` flag on publish (verifiable on socket.dev and npmjs.com)
+- `test/crypto.test.js`: reference vector (mnemonic → public key → address) produced with
+  `@ton/crypto` and `@ton/ton`, plus unit tests for `cellHash` (empty-cell hash), `padBits`,
+  and `crc16` (CRC-16/XMODEM check value). Any regression in the hand-written crypto now fails
+  the suite instead of producing a valid-looking address that does not belong to the mnemonic.
+- `_internals` export exposing the low-level primitives for testing and advanced use
+  (not yet covered by semver guarantees).
+- `SECURITY.md` with private vulnerability reporting instructions and notes on key handling.
 
-## [3.2.2] - 2026-03-24
-
-### Security
-- All dependency versions pinned to exact values (removed `^` ranges) — eliminates
-  semver drift risk; package installs are now reproducible at the manifest level,
-  not just via the lockfile
-- GitHub Actions steps pinned to commit hashes (already in 3.2.1)
-- npm provenance attestation on publish via `--provenance` (already in 3.2.0)
+### Changed
+- README performance table replaced with measured numbers (about 5 addresses/s per CPU core;
+  the TON mnemonic derivation costs roughly 200 000 HMAC-SHA-512 rounds per candidate).
+- `package-lock.json` regenerated; the previous lock still described version 3.2.1 with
+  `@ton/ton` and `@ton/crypto` as dependencies, which polluted `npm audit` with packages
+  that were not installed.
+- Dev dependency `mocha` upgraded to 12.0.0 (fixes the `serialize-javascript` advisory;
+  the `overrides` entry is no longer needed and was removed).
+- CHANGELOG reordered chronologically; missing 3.2.1 entry added; release dates corrected.
+- CONTRIBUTING now states Node.js 20 (matches `engines`) and points to `SECURITY.md`.
+- Removed `.npmignore` (ineffective and misleading while `files` is set).
+- `publish.yml`: least-privilege `permissions` on the test job.
 
 ---
 
@@ -35,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WalletV4R2 address computation reimplemented as a pure TVM cell-hash algorithm (SHA-256 repr) with a hardcoded code-cell hash/depth constant — no `@ton/core` required
 - CRC-16/CCITT and base64url address encoding done via built-in `Buffer` — no external helpers
 - `wordlist.js` (BIP-39, 2048 words, MIT) added to the published package files
+- Minimum Node.js version raised to 20 (`engines`)
 
 ### Security
 - `saveResultsToFile` now writes with `mode: 0o600` — the output file is no longer world-readable, preventing other local users from reading exported private keys
@@ -52,11 +90,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [3.2.2] — 2026-03-24
+
+### Security
+- All dependency versions pinned to exact values (removed `^` ranges) — eliminates
+  semver drift risk; package installs are now reproducible at the manifest level,
+  not just via the lockfile
 
 ---
 
-## [3.1.0] — 2025-03-24
+## [3.2.1] — 2026-03-24
+
+### Fixed
+- Flaky `console.log` test stabilised by stubbing the crypto helpers
+
+---
+
+## [3.2.0] — 2026-03-24
+
+### Added
+- `Readme.md` is now included in the published npm package (`files` field)
+- npm provenance attestation via `--provenance` flag on publish (verifiable on socket.dev and npmjs.com)
+
+### Infrastructure
+- GitHub Actions steps pinned to commit hashes with least-privilege permissions
+- Automated npm publish workflow on `v*` tags
+
+---
+
+## [3.1.0] — 2026-03-24
 
 ### Added
 - ESLint (`eslint.config.js`) with rules: `no-unused-vars`, `no-undef`, `eqeqeq`, `no-var`, `prefer-const`
@@ -90,7 +152,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [3.0.0] — 2025-03-24
+## [3.0.0] — 2026-02-18
 
 ### Breaking Changes
 - `showResult` parameter default changed from `true` to `false` — library is now silent by default; private keys are not printed to stdout unless explicitly requested

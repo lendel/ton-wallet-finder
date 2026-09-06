@@ -3,6 +3,7 @@
 const { expect } = require('chai');
 const sinon = require('sinon');
 const fs = require('fs');
+const path = require('path');
 const { TonWalletFinder, saveResultsToFile } = require('../index');
 
 describe('TonWalletFinder', () => {
@@ -35,6 +36,14 @@ describe('TonWalletFinder', () => {
 
         it('should throw on targetEnding with special chars like @#$', () => {
             expect(() => new TonWalletFinder('abc!')).to.throw(Error, /Invalid target ending/);
+        });
+
+        it('should accept a 46-character targetEnding (maximum matchable length)', () => {
+            expect(() => new TonWalletFinder('A'.repeat(46))).not.to.throw();
+        });
+
+        it('should throw on targetEnding longer than 46 characters (can never match)', () => {
+            expect(() => new TonWalletFinder('A'.repeat(47))).to.throw(Error, /can never be found/);
         });
 
         it('should default showProcess to false', () => {
@@ -197,6 +206,25 @@ describe('TonWalletFinder', () => {
             }
             expect(caughtError).to.be.instanceOf(Error);
             expect(caughtError.message).to.equal('Search cancelled by test');
+            expect(caughtError.name).to.equal('AbortError');
+            expect(caughtError.cause).to.equal('Search cancelled by test');
+        });
+
+        it('should keep an Error abort reason as cause and use its message', async function () {
+            this.timeout(5000);
+            const controller = new AbortController();
+            const reason = new Error('timeout hit');
+            controller.abort(reason);
+            const finder = new TonWalletFinder('A', false, false, false);
+            let caughtError;
+            try {
+                await finder.findWalletWithEnding({ signal: controller.signal });
+            } catch (err) {
+                caughtError = err;
+            }
+            expect(caughtError.name).to.equal('AbortError');
+            expect(caughtError.message).to.equal('timeout hit');
+            expect(caughtError.cause).to.equal(reason);
         });
 
         it('should reject immediately when an already-aborted signal is passed', async function () {
@@ -249,6 +277,54 @@ describe('TonWalletFinder', () => {
                 stub.restore();
             }
         });
+        // Persistent error: must NOT spin forever
+        it('should reject after repeated consecutive key generation errors', async function () {
+            this.timeout(5000);
+            const finder = new TonWalletFinder('A', false, false, false);
+            const boom = new Error('crypto unavailable');
+            const stub = sinon.stub(finder, 'createKeyPair').rejects(boom);
+            const errorStub = sinon.stub(console, 'error');
+            let caughtError;
+            try {
+                await finder.findWalletWithEnding();
+            } catch (err) {
+                caughtError = err;
+            } finally {
+                stub.restore();
+                errorStub.restore();
+            }
+            expect(caughtError).to.be.instanceOf(Error);
+            expect(caughtError.message).to.include('giving up');
+            expect(caughtError.cause).to.equal(boom);
+            expect(stub.callCount).to.equal(5);
+        });
+
+        it('should reset the consecutive error counter after a successful attempt', async function () {
+            this.timeout(5000);
+            const finder = new TonWalletFinder('A', false, false, false);
+            const fakeKeyPair = { publicKey: Buffer.alloc(32), secretKey: Buffer.alloc(64) };
+            let call = 0;
+            // Pattern: 4 errors, 1 success (no match), 4 errors, 1 success (match).
+            // Never 5 in a row, so the search must complete.
+            const stub = sinon.stub(finder, 'createKeyPair').callsFake(async () => {
+                call++;
+                if (call % 5 !== 0) { throw new Error('flaky'); }
+                return { keyPair: fakeKeyPair, words: Array(24).fill('abandon') };
+            });
+            const walletStub = sinon.stub(finder, 'createWallet')
+                .onFirstCall().returns({ toString: () => 'EQ' + 'B'.repeat(46) })
+                .onSecondCall().returns({ toString: () => 'EQ' + 'A'.repeat(46) });
+            const errorStub = sinon.stub(console, 'error');
+            try {
+                const result = await finder.findWalletWithEnding();
+                expect(result.walletAddress.endsWith('A')).to.equal(true);
+                expect(stub.callCount).to.equal(10);
+            } finally {
+                stub.restore();
+                walletStub.restore();
+                errorStub.restore();
+            }
+        });
     });
 
     // -------------------------------------------------------------------------
@@ -288,6 +364,88 @@ describe('TonWalletFinder', () => {
             await saveResultsToFile('pub', 'priv', ['w1'], 'EQX');
             const [filePath] = writeFileStub.firstCall.args;
             expect(filePath).to.include('ton_wallet_results.txt');
+        });
+
+        it('should write into the current working directory and return the absolute path', async () => {
+            const logStub = sinon.stub(console, 'log');
+            let returned;
+            try {
+                returned = await saveResultsToFile('pub', 'priv', ['w1'], 'EQX', 'out.txt');
+            } finally {
+                logStub.restore();
+            }
+            const expected = path.join(process.cwd(), 'out.txt');
+            expect(returned).to.equal(expected);
+            expect(writeFileStub.firstCall.args[0]).to.equal(expected);
+        });
+
+        it('should create the file exclusively (flag wx) with mode 0600', async () => {
+            const logStub = sinon.stub(console, 'log');
+            try {
+                await saveResultsToFile('pub', 'priv', ['w1'], 'EQX');
+            } finally {
+                logStub.restore();
+            }
+            const opts = writeFileStub.firstCall.args[2];
+            expect(opts).to.include({ mode: 0o600, flag: 'wx' });
+        });
+
+        it('should NOT overwrite an existing file: falls back to a -2 suffix on EEXIST', async () => {
+            const eexist = Object.assign(new Error('exists'), { code: 'EEXIST' });
+            writeFileStub.onFirstCall().rejects(eexist);
+            writeFileStub.onSecondCall().resolves();
+            const logStub = sinon.stub(console, 'log');
+            let returned;
+            try {
+                returned = await saveResultsToFile('pub', 'priv', ['w1'], 'EQX', 'result.txt');
+            } finally {
+                logStub.restore();
+            }
+            expect(writeFileStub.callCount).to.equal(2);
+            expect(writeFileStub.firstCall.args[0]).to.equal(path.join(process.cwd(), 'result.txt'));
+            expect(writeFileStub.secondCall.args[0]).to.equal(path.join(process.cwd(), 'result-2.txt'));
+            expect(returned).to.equal(path.join(process.cwd(), 'result-2.txt'));
+        });
+
+        it('should keep incrementing the suffix while files exist', async () => {
+            const eexist = Object.assign(new Error('exists'), { code: 'EEXIST' });
+            writeFileStub.onCall(0).rejects(eexist);
+            writeFileStub.onCall(1).rejects(eexist);
+            writeFileStub.onCall(2).rejects(eexist);
+            writeFileStub.onCall(3).resolves();
+            const logStub = sinon.stub(console, 'log');
+            let returned;
+            try {
+                returned = await saveResultsToFile('pub', 'priv', ['w1'], 'EQX', 'result.txt');
+            } finally {
+                logStub.restore();
+            }
+            expect(returned).to.equal(path.join(process.cwd(), 'result-4.txt'));
+        });
+
+        it('should return undefined and NOT retry on a non-EEXIST error', async () => {
+            writeFileStub.rejects(Object.assign(new Error('read-only fs'), { code: 'EROFS' }));
+            const consoleErrorStub = sinon.stub(console, 'error');
+            let returned;
+            try {
+                returned = await saveResultsToFile('pub', 'priv', ['w1'], 'EQX');
+            } finally {
+                consoleErrorStub.restore();
+            }
+            expect(returned).to.equal(undefined);
+            expect(writeFileStub.callCount).to.equal(1);
+            expect(consoleErrorStub.calledOnce).to.equal(true);
+        });
+
+        it('should reject an empty fileName', async () => {
+            const consoleErrorStub = sinon.stub(console, 'error');
+            try {
+                const returned = await saveResultsToFile('pub', 'priv', ['w'], 'EQ1', '');
+                expect(returned).to.equal(undefined);
+                expect(writeFileStub.callCount).to.equal(0);
+            } finally {
+                consoleErrorStub.restore();
+            }
         });
 
         it('should log error to console if fs.promises.writeFile rejects', async () => {

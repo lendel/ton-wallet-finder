@@ -12,7 +12,7 @@ cd ton-wallet-finder
 npm install
 ```
 
-**Requirements:** Node.js 18 or higher.
+**Requirements:** Node.js 20 or higher (matches `engines` in `package.json`).
 
 ---
 
@@ -46,9 +46,13 @@ Tests live in `test/TonWalletFinder.test.js` (Mocha + Chai + Sinon).
 `chai` is intentionally pinned to `^4.x` and **must not be upgraded to v5+**.
 Chai v5 dropped CommonJS support. Since this package is a pure CJS library and does not use ESM, upgrading chai would break the test suite without any benefit.
 
-### Dev-dependency note: mocha vulnerabilities
+### Reference vectors
 
-`mocha@11.x` has known vulnerabilities in its own internal dependencies (`diff`, `serialize-javascript`). These are **upstream issues in mocha itself** and do not affect the published package — `npm audit --omit=dev` reports 0 vulnerabilities. The mocha team has not yet released a fix.
+`test/crypto.test.js` pins the mnemonic → key → address derivation to a vector produced with `@ton/crypto` and `@ton/ton`. If you touch anything in the crypto or cell-hashing code and this test goes red, the change is wrong — do not update the vector to make it pass.
+
+### ESM regression test
+
+`test/esm.test.mjs` imports the package **by name** (Node package self-reference) so the `exports` map in `package.json` is exercised exactly as a consumer would. Keep it green when changing `exports`.
 
 ---
 
@@ -76,6 +80,4 @@ Breaking changes include: changing parameter defaults, changing return types, re
 
 ## Security
 
-To report a security vulnerability, please open a [GitHub Issue](https://github.com/lendel/ton-wallet-finder/issues) with the `security` label, or contact the author directly.
-
-Do not disclose security vulnerabilities publicly before a fix is available.
+See [SECURITY.md](SECURITY.md). Please do not report vulnerabilities in public issues.

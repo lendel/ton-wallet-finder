@@ -6,7 +6,7 @@ export interface WalletResult {
     readonly publicKey: string;
     /** Hex-encoded Ed25519 private key / secret key (128 characters) */
     readonly privateKey: string;
-    /** 24-word BIP39 mnemonic seed phrase */
+    /** 24-word TON mnemonic (BIP-39 English word list, TON derivation) */
     readonly words: readonly string[];
     /** TON wallet address in URL-safe bounceable format (e.g. EQ...) */
     readonly walletAddress: string;
@@ -18,8 +18,9 @@ export interface WalletResult {
 export interface FindOptions {
     /**
      * An AbortSignal to cancel the search.
-     * When aborted, `findWalletWithEnding` rejects with an Error whose message
-     * is taken from `signal.reason` (if a string) or `'Wallet search aborted'`.
+     * When aborted, `findWalletWithEnding` rejects with an Error whose `name` is
+     * `'AbortError'`, whose message is taken from `signal.reason` (if a string)
+     * or `'Wallet search aborted'`, and whose `cause` is the original `signal.reason`.
      */
     readonly signal?: AbortSignal;
 }
@@ -55,10 +56,11 @@ export declare class TonWalletFinder {
     /**
      * @param targetEnding - Desired suffix for the wallet address.
      *   Only Latin letters [a-zA-Z], digits [0-9], dashes [-] and underscores [_] are allowed.
+     *   At most 46 characters (a TON address has 46 matchable characters after the `EQ`/`UQ` tag).
      * @param showProcess - Log each attempted address. Default: `false`
      * @param showResult  - Log the found wallet to console. Default: `false`
      * @param saveResult  - Save the result to a text file. Default: `false`
-     * @throws {Error} If `targetEnding` contains invalid characters.
+     * @throws {Error} If `targetEnding` contains invalid characters or is longer than 46 characters.
      */
     constructor(
         targetEnding: string,
@@ -73,14 +75,19 @@ export declare class TonWalletFinder {
     createKeyPair(): Promise<{ keyPair: { publicKey: Uint8Array; secretKey: Uint8Array }; words: string[] }>;
 
     /**
-     * Creates a WalletContractV4 instance from a key pair and returns its address object.
+     * Derives the WalletV4 (workchain 0) address for a key pair and returns an
+     * address object. `toString()` always yields the bounceable, URL-safe form;
+     * the options argument is accepted for compatibility and ignored.
      * Synchronous — no I/O is performed.
      */
-    createWallet(keyPair: { publicKey: Uint8Array; secretKey: Uint8Array }): { toString(opts: { urlSafe: boolean; bounceable: boolean }): string };
+    createWallet(keyPair: { publicKey: Uint8Array; secretKey: Uint8Array }): { toString(opts?: { urlSafe?: boolean; bounceable?: boolean }): string };
 
     /**
      * Continuously generates random wallets until one whose address ends with `targetEnding` is found.
      * Pass `options.signal` to cancel the search at any time.
+     *
+     * Transient key-generation errors are retried; after 5 consecutive failures the
+     * promise rejects with an Error whose `cause` is the last failure.
      *
      * @param options - Optional configuration (e.g. AbortSignal).
      * @returns The found wallet's credentials.
@@ -89,15 +96,19 @@ export declare class TonWalletFinder {
 }
 
 /**
- * Saves wallet credentials to a plain-text file using `fs.promises.writeFile`.
- * The returned Promise resolves once the file has been fully written to disk.
+ * Saves wallet credentials to a plain-text file in the current working directory
+ * (`process.cwd()`), created with mode `0600`.
+ *
+ * Never overwrites: if `fileName` already exists, a numeric suffix is appended
+ * (`ton_wallet_results-2.txt`, `-3`, …).
  *
  * @param publicKey     - Hex-encoded public key.
  * @param privateKey    - Hex-encoded private/secret key.
  * @param words         - Mnemonic seed phrase (array or pre-joined string).
  * @param walletAddress - TON wallet address string.
- * @param fileName      - Output filename. Default: `'ton_wallet_results.txt'`
- * @returns Promise that resolves when the file is written (never rejects — errors are logged).
+ * @param fileName      - Output filename (no path separators). Default: `'ton_wallet_results.txt'`
+ * @returns The absolute path of the written file, or `undefined` if writing failed
+ *          (never rejects — errors are logged).
  */
 export declare function saveResultsToFile(
     publicKey: string,
@@ -105,4 +116,4 @@ export declare function saveResultsToFile(
     words: string[] | string,
     walletAddress: string,
     fileName?: string
-): Promise<void>;
+): Promise<string | undefined>;

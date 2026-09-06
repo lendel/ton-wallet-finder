@@ -24,7 +24,7 @@ function ed25519FromSeed(seed) {
     const pub         = crypto.createPublicKey(priv);
     // SPKI DER for Ed25519 ends with the 32-byte raw public key.
     const spki        = pub.export({ format: 'der', type: 'spki' });
-    const publicKey   = spki.slice(-32);
+    const publicKey   = spki.subarray(-32);
     // tweetnacl-compatible 64-byte secretKey = seed ‖ publicKey
     const secretKey   = Buffer.concat([seed, publicKey]);
     return { publicKey, secretKey };
@@ -38,7 +38,7 @@ function ed25519FromSeed(seed) {
  * HMAC-SHA-512: key first, then data — matches @ton/crypto hmac_sha512(key, data) convention.
  */
 function hmacSha512(key, data) {
-    return crypto.createHmac('sha512', Buffer.from(key)).update(Buffer.from(data)).digest();
+    return crypto.createHmac('sha512', key).update(data).digest();
 }
 
 /**
@@ -87,7 +87,7 @@ async function mnemonicToPrivateKey(words) {
     const norm    = words.map(w => w.toLowerCase().trim());
     const entropy = hmacSha512(norm.join(' '), '');
     const seed64  = await pbkdf2Sha512(entropy, 'TON default seed', 100000, 64);
-    return ed25519FromSeed(seed64.slice(0, 32));
+    return ed25519FromSeed(seed64.subarray(0, 32));
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ function cellHash(bitsCount, bitsBytes, refs) {
  * and clear the rest of the byte.
  */
 function padBits(bitsCount, bitsBytes) {
-    const result = Buffer.from(bitsBytes.slice(0, Math.ceil(bitsCount / 8)));
+    const result = Buffer.from(bitsBytes.subarray(0, Math.ceil(bitsCount / 8)));
     if (bitsCount % 8 !== 0) {
         const rem     = bitsCount % 8;
         const padMask = 0x80 >> rem;
@@ -144,6 +144,21 @@ function padBits(bitsCount, bitsBytes) {
 }
 
 /**
+ * CRC-16/XMODEM (poly 0x1021, init 0) — the checksum used in TON user-friendly addresses.
+ */
+function crc16(data) {
+    let crc = 0;
+    for (let i = 0; i < data.length; i++) {
+        crc ^= data[i] << 8;
+        for (let j = 0; j < 8; j++) {
+            crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+        }
+        crc &= 0xffff;
+    }
+    return crc;
+}
+
+/**
  * Derive a WalletV4 (workchain 0) address from a 32-byte Ed25519 public key.
  * Returns a bounceable, URL-safe base64 string (48 chars).
  */
@@ -151,12 +166,11 @@ function walletV4Address(pubkey, workchain = 0) {
     const subwalletId = 698983191 + workchain;
 
     // ---- Data cell: seqno(32) | subwallet_id(32) | pubkey(256) | has_plugins(1) ----
-    // Total = 321 bits; last byte: has_plugins=0 + padding bit 1 + 000000 = 0x40
+    // Total = 321 bits; has_plugins = 0, padBits() sets the trailing "1" completion bit.
     const dataBuf = Buffer.alloc(41, 0);
     dataBuf.writeUInt32BE(0,           0);  // seqno
     dataBuf.writeUInt32BE(subwalletId, 4);  // subwallet_id
     pubkey.copy(dataBuf, 8);                // 32 bytes public key
-    dataBuf[40] = 0x40;                     // padding for the trailing 1 bit
     const dataHash  = cellHash(321, padBits(321, dataBuf), []);
     const dataDepth = 0;
 
@@ -174,14 +188,7 @@ function walletV4Address(pubkey, workchain = 0) {
     addr.writeInt8(workchain, 1);      // workchain (signed byte)
     siHash.copy(addr, 2);
 
-    let crc = 0;
-    for (let i = 0; i < 34; i++) {
-        crc ^= addr[i] << 8;
-        for (let j = 0; j < 8; j++) {
-            crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
-        }
-        crc &= 0xffff;
-    }
+    const crc = crc16(addr.subarray(0, 34));
     addr[34] = (crc >> 8) & 0xff;
     addr[35] =  crc       & 0xff;
 
@@ -191,6 +198,14 @@ function walletV4Address(pubkey, workchain = 0) {
 // ---------------------------------------------------------------------------
 // TonWalletFinder
 // ---------------------------------------------------------------------------
+
+// A user-friendly address is 48 chars and always starts with the 2-char tag
+// ("EQ"/"UQ" for workchain 0), so at most 46 chars can be matched as a suffix.
+const MAX_TARGET_LENGTH = 46;
+
+// Give up after this many *consecutive* failures in key/address generation.
+// Transient errors are retried; a persistent one must not spin forever.
+const MAX_CONSECUTIVE_ERRORS = 5;
 
 class TonWalletFinder {
     /**
@@ -205,6 +220,9 @@ class TonWalletFinder {
         const validEndingRegex = /^[a-zA-Z0-9_-]+$/;
         if (!validEndingRegex.test(targetEnding)) {
             throw new Error('Invalid target ending. Only Latin letters, numbers, dashes, and underscores are allowed.');
+        }
+        if (targetEnding.length > MAX_TARGET_LENGTH) {
+            throw new Error(`Invalid target ending. A TON address has only ${MAX_TARGET_LENGTH} matchable characters, so an ending of ${targetEnding.length} characters can never be found.`);
         }
 
         this.targetEnding = targetEnding;
@@ -245,6 +263,7 @@ class TonWalletFinder {
         // Declared once outside the loop; reused after the loop exits
         let walletAddress;
         let found = false;
+        let consecutiveErrors = 0;
 
         // Search loop — generates wallets until the address suffix matches
         do {
@@ -254,13 +273,22 @@ class TonWalletFinder {
                 const message = typeof reason === 'string'
                     ? reason
                     : reason?.message ?? 'Wallet search aborted';
-                throw new Error(message);
+                const abortError = new Error(message, { cause: reason });
+                abortError.name = 'AbortError';
+                throw abortError;
             }
 
             try {
                 ({ keyPair, words } = await this.createKeyPair());
                 walletAddress = this.createWallet(keyPair).toString({ urlSafe: true, bounceable: true });
+                consecutiveErrors = 0;
             } catch (err) {
+                consecutiveErrors++;
+                if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                    throw new Error(
+                        `Wallet generation failed ${consecutiveErrors} times in a row, giving up: ${err.message}`,
+                        { cause: err });
+                }
                 console.error('Error generating wallet, retrying:', err.message);
                 continue;
             }
@@ -291,48 +319,78 @@ class TonWalletFinder {
     }
 }
 
+// Upper bound on "name-2.txt", "name-3.txt", … fallbacks before giving up.
+const MAX_FILENAME_ATTEMPTS = 1000;
+
 /**
- * Write wallet credentials to a plain-text file.
- * Uses fs.promises so the write is fully awaited — no data loss on fast exit.
+ * Write wallet credentials to a plain-text file in the current working directory.
+ *
+ * Never overwrites: the file is created with the exclusive `wx` flag, and if a
+ * file with that name already exists a numeric suffix is appended
+ * (`ton_wallet_results-2.txt`, `-3`, …). The file is created with mode 0600.
  *
  * @param {string}          publicKey
  * @param {string}          privateKey
  * @param {string[]|string} words
  * @param {string}          walletAddress
- * @param {string}          [fileName='ton_wallet_results.txt']
- * @returns {Promise<void>}
+ * @param {string}          [fileName='ton_wallet_results.txt'] - plain filename, no path separators
+ * @returns {Promise<string|undefined>} absolute path of the written file, or undefined on error
  */
 async function saveResultsToFile(publicKey, privateKey, words, walletAddress, fileName = 'ton_wallet_results.txt') {
     if (typeof publicKey !== 'string' || typeof privateKey !== 'string' || typeof walletAddress !== 'string') {
         console.error('Error: publicKey, privateKey, and walletAddress must be strings.');
-        return;
+        return undefined;
     }
 
     // Path traversal guard — fileName must be a plain filename, not a path.
-    if (path.basename(fileName) !== fileName) {
+    if (typeof fileName !== 'string' || fileName.length === 0 || path.basename(fileName) !== fileName) {
         console.error('Error: fileName must be a plain filename without path separators.');
-        return;
+        return undefined;
     }
-
-    // require.main can be null in ESM environments and test frameworks
-    const scriptDirectory = require.main
-        ? path.dirname(require.main.filename)
-        : process.cwd();
-    const resultsFile = path.join(scriptDirectory, fileName);
 
     // words may arrive as an array or as an already-joined string
     const wordsString = Array.isArray(words) ? words.join(' ') : words;
     const data = `Public Key: ${publicKey}\nPrivate Key: ${privateKey}\nWords: ${wordsString}\nWallet: ${walletAddress}\n`;
 
+    const ext  = path.extname(fileName);
+    const stem = fileName.slice(0, fileName.length - ext.length);
+    const dir  = process.cwd();
+
     try {
-        await fs.promises.writeFile(resultsFile, data, { mode: 0o600 });
-        console.log(`Results saved to ${resultsFile}`);
+        for (let attempt = 1; attempt <= MAX_FILENAME_ATTEMPTS; attempt++) {
+            const candidate = attempt === 1 ? fileName : `${stem}-${attempt}${ext}`;
+            const resultsFile = path.join(dir, candidate);
+            try {
+                // 'wx' = create only; fails with EEXIST instead of truncating an existing file.
+                await fs.promises.writeFile(resultsFile, data, { mode: 0o600, flag: 'wx' });
+                console.log(`Results saved to ${resultsFile}`);
+                return resultsFile;
+            } catch (err) {
+                if (err.code !== 'EEXIST') { throw err; }
+            }
+        }
+        throw new Error(`Could not find a free filename for ${fileName} after ${MAX_FILENAME_ATTEMPTS} attempts.`);
     } catch (err) {
         console.error('Error while writing results to file:', err);
+        return undefined;
     }
 }
 
+// Kept as a flat identifier list so Node's CJS named-export detection
+// (cjs-module-lexer) picks these up for `import { TonWalletFinder } from ...`.
 module.exports = {
     TonWalletFinder,
     saveResultsToFile,
+};
+
+// Low-level primitives, exposed for testing and advanced use.
+// Not covered by semver guarantees yet; the public surface is the two exports above.
+module.exports._internals = {
+    mnemonicNew,
+    mnemonicToPrivateKey,
+    isBasicSeed,
+    walletV4Address,
+    cellHash,
+    padBits,
+    crc16,
 };
