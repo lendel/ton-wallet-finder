@@ -31,6 +31,21 @@ describe('crypto primitives (reference vectors)', () => {
             expect(pkg.TonWalletFinder).to.be.a('function');
             expect(pkg.saveResultsToFile).to.be.a('function');
         });
+
+        it('should expose package.json through the exports map', () => {
+            // Tooling (bundlers, version checkers) reads this subpath; without an
+            // explicit entry Node rejects it with ERR_PACKAGE_PATH_NOT_EXPORTED.
+            const manifest = require('ton-wallet-finder/package.json');
+            expect(manifest.name).to.equal('ton-wallet-finder');
+            expect(manifest.version).to.equal(require('../package.json').version);
+        });
+
+        it('should not expose other internal files as subpaths', () => {
+            let err;
+            try { require('ton-wallet-finder/wordlist.js'); } catch (e) { err = e; }
+            expect(err, 'wordlist.js must not be reachable as a subpath').to.be.instanceOf(Error);
+            expect(err.code).to.equal('ERR_PACKAGE_PATH_NOT_EXPORTED');
+        });
     });
 
     describe('mnemonicToPrivateKey()', () => {

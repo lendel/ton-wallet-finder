@@ -1,6 +1,6 @@
 {
   "name": "ton-wallet-finder",
-  "version": "5.1.0",
+  "version": "5.1.1",
   "description": "Vanity address generator for TON blockchain — find a wallet address (v3r2 / v4r2 / v5r1) ending with any custom string.",
   "main": "index.js",
   "exports": {
@@ -9,7 +9,8 @@
       "import": "./index.js",
       "require": "./index.js",
       "default": "./index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "types": "index.d.ts",
   "files": [
