@@ -27,9 +27,9 @@ digits, - and _). By default the result is saved to an encrypted file and the
 password is asked for before the search starts.
 
 Options:
-  -w, --wallet <version>   Wallet contract: v3r2, v4r2 or v5r1 (default: v4r2).
-                           Must match the wallet app you will import the words into
-                           (Tonkeeper and Telegram Wallet use v5r1).
+  -w, --wallet <version>   Wallet contract: v3r2, v4r2 or v5r1 (default: v5r1, the
+                           current standard in Tonkeeper and Telegram Wallet). Must match
+                           the wallet app you will import the words into.
   -j, --workers <n|auto>   Worker threads (default: auto = one per CPU core)
   -o, --output <file>      File name in the current directory
                            (default: ton_wallet_results.enc.json, or .txt with --plain)
@@ -44,8 +44,8 @@ Options:
   -v, --version            Show the version
 
 Examples:
-  npx ton-wallet-finder abc --wallet v5r1
-  npx ton-wallet-finder Cafe -w v5r1 -j 4 -o my-wallet.json
+  npx ton-wallet-finder abc
+  npx ton-wallet-finder Cafe -w v4r2 -j 4 -o my-wallet.json
   WALLET_PW=... npx ton-wallet-finder 42 --password-env WALLET_PW
   npx ton-wallet-finder --decrypt ton_wallet_results.enc.json
 
@@ -95,7 +95,9 @@ function parseCli(argv) {
             ? 'Missing <ending>.'
             : `Expected one <ending>, got ${positionals.length}: ${positionals.join(' ')}`);
     }
-    const wallet = values.wallet ?? 'v4r2';
+    // The CLI defaults to the current wallet standard (W5); the library keeps 'v4r2' as its
+    // default so existing code keeps deriving the same addresses.
+    const wallet = values.wallet ?? 'v5r1';
     if (!WALLET_VERSIONS.includes(wallet)) {
         throw new UsageError(`--wallet must be one of ${WALLET_VERSIONS.join(', ')}, got "${wallet}".`);
     }

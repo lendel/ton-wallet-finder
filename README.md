@@ -48,7 +48,7 @@ Requires **Node.js 22** or newer.
 ## Command line
 
 ```sh
-npx ton-wallet-finder abc --wallet v5r1
+npx ton-wallet-finder abc                 # W5 (v5r1) wallet, like Tonkeeper
 ```
 
 The tool asks for a password **before** the search starts, shows live progress (attempts,
@@ -61,7 +61,7 @@ npx ton-wallet-finder --decrypt ton_wallet_results.enc.json
 
 | Option | Description |
 |---|---|
-| `-w, --wallet <v3r2\|v4r2\|v5r1>` | Wallet contract (default `v4r2`); must match your wallet app — Tonkeeper and Telegram Wallet use `v5r1` |
+| `-w, --wallet <v3r2\|v4r2\|v5r1>` | Wallet contract (default `v5r1`, the current standard in Tonkeeper and Telegram Wallet); must match your wallet app |
 | `-j, --workers <n\|auto>` | Worker threads (default `auto`: one per CPU core) |
 | `-o, --output <file>` | File name in the current directory |
 | `--password-env <VAR>` | Take the password from an environment variable instead of asking (for scripts) |
