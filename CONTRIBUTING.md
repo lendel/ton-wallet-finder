@@ -74,7 +74,7 @@ Tests live in `test/` (Mocha + Chai + Sinon):
 2. Write tests for your changes
 3. Ensure `npm run check` passes
 4. Update `CHANGELOG.md` under `[Unreleased]`
-5. Open a PR against `master`; the branch is deleted after merge
+5. Open a PR against `main`; the branch is deleted after merge
 
 ### Branch names
 
@@ -119,7 +119,7 @@ Breaking changes include: changing parameter defaults, changing return types, re
 
 Releases are published by CI only (`.github/workflows/publish.yml`), never from a laptop.
 
-1. Merge the release PR into `master` (version bumped in `package.json`, `CHANGELOG.md` updated).
+1. Merge the release PR into `main` (version bumped in `package.json`, `CHANGELOG.md` updated).
 2. Tag and push:
    ```sh
    git tag vX.Y.Z && git push origin vX.Y.Z
@@ -145,7 +145,7 @@ be registered once on npmjs.com by a package maintainer:
 
 If a tagged run failed (for example before the trusted publisher was registered), fix the
 cause and either move the tag to the fixed commit and push it again, or start the
-workflow manually from the *Actions* tab (**Run workflow**) on `master`.
+workflow manually from the *Actions* tab (**Run workflow**) on `main`.
 
 ---
 
