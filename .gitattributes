@@ -1,0 +1,5 @@
+# Normalise line endings; the code and tests assume LF.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary

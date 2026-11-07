@@ -25,6 +25,7 @@ const nodeGlobals = {
     AbortSignal:     'readonly',
     setTimeout:      'readonly',
     clearTimeout:    'readonly',
+    setImmediate:    'readonly',
 };
 
 const mochaGlobals = {
@@ -37,6 +38,9 @@ const mochaGlobals = {
 };
 
 module.exports = [
+    {
+        ignores: ['coverage/**', 'node_modules/**'],
+    },
     {
         files: ['index.js', 'worker.js', 'eslint.config.js'],
         languageOptions: {
