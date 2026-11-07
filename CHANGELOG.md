@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- README restructured as a landing page: safety section, wallet-version guidance up front,
+  clickable badges, `await`/ESM quick start that saves an encrypted file, Contributing and
+  Security sections. About 200 lines instead of 730.
+- The Russian documentation moved from a collapsed block in `README.md` to `README.ru.md`.
+- Migration guides (2.x → 6.0) and the per-version "what's new" sections moved to
+  `docs/MIGRATION.md` / `docs/MIGRATION.ru.md`.
+
 ---
 
 ## [6.0.1] — 2026-11-07

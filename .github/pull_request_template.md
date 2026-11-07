@@ -7,5 +7,5 @@
 - [ ] `npm run check` passes (lint, types, tests with coverage)
 - [ ] Tests added or updated for the change
 - [ ] `CHANGELOG.md` updated under `[Unreleased]`
-- [ ] `README.md` / `index.d.ts` updated if the public API changed
+- [ ] `README.md` + `README.ru.md` / `index.d.ts` updated if the public API changed (and `docs/MIGRATION*.md` for breaking changes)
 - [ ] No private keys, mnemonics or results files committed
