@@ -22,6 +22,8 @@ const WALLET_VERSIONS     = ['v3r2', 'v4r2', 'v5r1'];
 const HELP = `Usage: ton-wallet-finder <ending> [options]
        ton-wallet-finder --decrypt <file> [--password-env <VAR>]
 
+After a global install (npm i -g ton-wallet-finder) the short name tonwf works too.
+
 Find a TON wallet whose address ends with <ending> (case-sensitive; letters,
 digits, - and _). By default the result is saved to an encrypted file and the
 password is asked for before the search starts.

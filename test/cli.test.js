@@ -50,6 +50,12 @@ describe('CLI', function () {
             expect(stdout).to.include('Usage: ton-wallet-finder <ending>');
         });
 
+        it('installs both command names, pointing at the same script', () => {
+            const { bin } = require('../package.json');
+            expect(bin).to.deep.equal({ 'ton-wallet-finder': 'cli.js', tonwf: 'cli.js' });
+            expect(fs.readFileSync(CLI, 'utf8').startsWith('#!/usr/bin/env node')).to.equal(true);
+        });
+
         it('--version prints the package version', async () => {
             const { code, stdout } = await run(['-v']);
             expect(code).to.equal(0);
