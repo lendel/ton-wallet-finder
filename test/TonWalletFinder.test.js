@@ -347,6 +347,7 @@ describe('TonWalletFinder', () => {
         it('should reject after repeated consecutive key generation errors', async function () {
             this.timeout(5000);
             const finder = new TonWalletFinder('A');
+            finder._mainThreadConcurrency = 1; // exact call counts below assume one loop
             const boom = new Error('crypto unavailable');
             const stub = sinon.stub(finder, 'createKeyPair').rejects(boom);
             const errorStub = sinon.stub(console, 'error');
@@ -368,6 +369,7 @@ describe('TonWalletFinder', () => {
         it('should reset the consecutive error counter after a successful attempt', async function () {
             this.timeout(5000);
             const finder = new TonWalletFinder('A');
+            finder._mainThreadConcurrency = 1; // the error/success pattern assumes one loop
             const fakeKeyPair = { publicKey: Buffer.alloc(32), secretKey: Buffer.alloc(64) };
             let call = 0;
             // Pattern: 4 errors, 1 success (no match), 4 errors, 1 success (match).
@@ -390,6 +392,72 @@ describe('TonWalletFinder', () => {
                 walletStub.restore();
                 errorStub.restore();
             }
+        });
+    });
+
+    // -------------------------------------------------------------------------
+    // single-threaded concurrency
+    // -------------------------------------------------------------------------
+    describe('single-threaded concurrency', () => {
+        const fakeKeyPair = { publicKey: Buffer.alloc(32), secretKey: Buffer.alloc(64) };
+        const words = Array(24).fill('abandon');
+
+        it('should default to between 1 and the libuv pool size concurrent attempts', () => {
+            const finder = new TonWalletFinder('A');
+            expect(finder._mainThreadConcurrency).to.be.within(1, Number(process.env.UV_THREADPOOL_SIZE) || 4);
+        });
+
+        it('should keep _mainThreadConcurrency attempts in flight and resolve with the first match', async () => {
+            const finder = new TonWalletFinder('A');
+            finder._mainThreadConcurrency = 4;
+            let inFlight = 0;
+            let maxInFlight = 0;
+            let calls = 0;
+            const keyStub = sinon.stub(finder, 'createKeyPair').callsFake(async () => {
+                inFlight++;
+                maxInFlight = Math.max(maxInFlight, inFlight);
+                calls++;
+                await new Promise(r => setTimeout(r, 5));
+                inFlight--;
+                return { keyPair: fakeKeyPair, words };
+            });
+            let n = 0;
+            const walletStub = sinon.stub(finder, 'createWallet').callsFake(() => {
+                n++;
+                const addr = 'EQ' + (n === 10 ? 'A' : 'B').repeat(46);
+                return { toString: () => addr };
+            });
+            try {
+                const result = await finder.findWalletWithEnding();
+                expect(result.walletAddress.endsWith('A')).to.equal(true);
+                expect(maxInFlight).to.equal(4);
+                // Attempts already in flight may finish, but no new ones start after the match.
+                await new Promise(r => setTimeout(r, 20));
+                expect(calls).to.be.at.most(10 + 3);
+            } finally {
+                keyStub.restore();
+                walletStub.restore();
+            }
+        });
+
+        it('should reject on abort without waiting for in-flight attempts', async () => {
+            const finder = new TonWalletFinder('A');
+            finder._mainThreadConcurrency = 2;
+            const keyStub = sinon.stub(finder, 'createKeyPair').callsFake(
+                () => new Promise(r => setTimeout(() => r({ keyPair: fakeKeyPair, words }), 500)));
+            const controller = new AbortController();
+            const started = Date.now();
+            setTimeout(() => controller.abort('stop'), 20);
+            let err;
+            try {
+                await finder.findWalletWithEnding({ signal: controller.signal });
+            } catch (e) {
+                err = e;
+            } finally {
+                keyStub.restore();
+            }
+            expect(err.name).to.equal('AbortError');
+            expect(Date.now() - started).to.be.below(400);
         });
     });
 
@@ -538,10 +606,15 @@ describe('TonWalletFinder', () => {
             }
         });
 
-        it('should return a Promise (function is async)', () => {
-            const result = saveResultsToFile('pub', 'priv', ['w'], 'EQ1');
-            expect(result).to.be.instanceOf(Promise);
-            return result;
+        it('should return a Promise (function is async)', async () => {
+            const logStub = sinon.stub(console, 'log');
+            try {
+                const result = saveResultsToFile('pub', 'priv', ['w'], 'EQ1');
+                expect(result).to.be.instanceOf(Promise);
+                await result;
+            } finally {
+                logStub.restore();
+            }
         });
 
         // Path traversal protection

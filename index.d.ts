@@ -21,6 +21,22 @@ export interface WalletResult {
 export type WalletVersion = 'v3r2' | 'v4r2' | 'v5r1';
 
 /**
+ * Options for saving a result to disk.
+ */
+export interface SaveOptions {
+    /**
+     * Encrypt the file with this password (scrypt N=2^17 + AES-256-GCM). Must be non-empty.
+     * Without it the file is written as plain text.
+     */
+    readonly password?: string;
+    /**
+     * Plain filename (no path separators) in the current working directory.
+     * Default: `'ton_wallet_results.enc.json'` with a password, `'ton_wallet_results.txt'` without.
+     */
+    readonly fileName?: string;
+}
+
+/**
  * Options accepted by the `TonWalletFinder` constructor.
  */
 export interface TonWalletFinderOptions {
@@ -30,8 +46,15 @@ export interface TonWalletFinderOptions {
     /** Log the found wallet credentials to console. Default: `false` */
     readonly showResult?: boolean;
 
-    /** Save the found wallet credentials to a text file. Default: `false` */
-    readonly saveResult?: boolean;
+    /**
+     * Save the found wallet credentials to a file in the current working directory.
+     * - `true` — plain text, `ton_wallet_results.txt`
+     * - `{ password }` — encrypted (scrypt + AES-256-GCM), `ton_wallet_results.enc.json`;
+     *   read it back with `decryptResults()`
+     *
+     * Default: `false`. Validated at construction.
+     */
+    readonly saveResult?: boolean | SaveOptions;
 
     /**
      * Default number of worker threads to search on in parallel, or `'auto'` for one per
@@ -98,8 +121,8 @@ export declare class TonWalletFinder {
     readonly showProcess: boolean;
     /** Whether to log the found wallet credentials to console */
     readonly showResult: boolean;
-    /** Whether to save the found wallet credentials to a file */
-    readonly saveResult: boolean;
+    /** Whether (and how) to save the found wallet credentials to a file */
+    readonly saveResult: boolean | SaveOptions;
     /** Default worker count used by `findWalletWithEnding()` unless overridden per call */
     readonly workers: number | 'auto';
     /** TON wallet contract version addresses are derived for */
@@ -113,6 +136,7 @@ export declare class TonWalletFinder {
      * @throws {Error} If `targetEnding` contains invalid characters or is longer than 46
      *   characters, or if `walletVersion` is not a supported version.
      * @throws {RangeError} If `workers` is not a positive integer or `'auto'`.
+     * @throws {TypeError} If `saveResult` is not a boolean or valid `SaveOptions`.
      */
     constructor(
         targetEnding: string,
@@ -147,17 +171,18 @@ export declare class TonWalletFinder {
 }
 
 /**
- * Saves wallet credentials to a plain-text file in the current working directory
+ * Saves wallet credentials to a file in the current working directory
  * (`process.cwd()`), created with mode `0600`.
  *
- * Never overwrites: if `fileName` already exists, a numeric suffix is appended
+ * Never overwrites: if the file already exists, a numeric suffix is appended
  * (`ton_wallet_results-2.txt`, `-3`, …).
  *
  * @param publicKey     - Hex-encoded public key.
  * @param privateKey    - Hex-encoded private/secret key.
  * @param words         - Mnemonic seed phrase (array or pre-joined string).
  * @param walletAddress - TON wallet address string.
- * @param fileName      - Output filename (no path separators). Default: `'ton_wallet_results.txt'`
+ * @param options       - A plain filename (plain-text output), or `SaveOptions`
+ *                        (`{ password }` encrypts the file).
  * @returns The absolute path of the written file, or `undefined` if writing failed
  *          (never rejects — errors are logged).
  */
@@ -166,8 +191,26 @@ export declare function saveResultsToFile(
     privateKey: string,
     words: string[] | string,
     walletAddress: string,
-    fileName?: string
+    options?: string | SaveOptions
 ): Promise<string | undefined>;
+
+/**
+ * Decrypts a file written with a password (`saveResult: { password }` or
+ * `saveResultsToFile(..., { password })`).
+ *
+ * @example
+ * ```js
+ * const fs = require('fs');
+ * const { decryptResults } = require('ton-wallet-finder');
+ * const wallet = await decryptResults(fs.readFileSync('ton_wallet_results.enc.json'), password);
+ * ```
+ *
+ * @param data     - Contents of the encrypted file.
+ * @param password - The password used when saving.
+ * @throws {Error} On a wrong password, a modified or corrupted file, or an unsupported format.
+ * @throws {TypeError} If `password` is not a non-empty string.
+ */
+export declare function decryptResults(data: string | Uint8Array, password: string): Promise<WalletResult>;
 
 /**
  * Ed25519 key pair in tweetnacl layout: 32-byte public key and 64-byte secret key (seed ‖ publicKey).
@@ -184,10 +227,16 @@ export interface Ed25519KeyPair {
 export declare const _internals: {
     /** Generate a fresh 24-word TON mnemonic (passes the TON seed-version check). */
     mnemonicNew(): Promise<string[]>;
+    /** Synchronous `mnemonicNew()` — blocks the thread; meant for worker threads. */
+    mnemonicNewSync(): string[];
     /** Derive the Ed25519 key pair from a TON mnemonic (no password). */
     mnemonicToPrivateKey(words: readonly string[]): Promise<Ed25519KeyPair>;
+    /** Synchronous `mnemonicToPrivateKey()` — blocks the thread; meant for worker threads. */
+    mnemonicToPrivateKeySync(words: readonly string[]): Ed25519KeyPair;
     /** TON "basic seed" check — `true` if the mnemonic is valid without a password. */
     isBasicSeed(words: readonly string[]): Promise<boolean>;
+    /** Synchronous `isBasicSeed()`. */
+    isBasicSeedSync(words: readonly string[]): boolean;
     /** Bounceable, URL-safe address for a 32-byte public key and the given wallet version. */
     walletAddress(version: WalletVersion, publicKey: Uint8Array, workchain?: number): string;
     /** Bounceable, URL-safe WalletV3R2 address for a 32-byte public key. */
@@ -202,4 +251,6 @@ export declare const _internals: {
     padBits(bitsCount: number, bitsBytes: Uint8Array): Uint8Array;
     /** CRC-16/XMODEM (poly 0x1021, init 0), as used in TON user-friendly addresses. */
     crc16(data: Uint8Array): number;
+    /** Encrypt a result with a password; returns the JSON text that `decryptResults()` reads. */
+    encryptResults(result: WalletResult, password: string): Promise<string>;
 };

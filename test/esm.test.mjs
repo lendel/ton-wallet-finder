@@ -3,16 +3,16 @@
 // exact same resolution a consumer's `import ... from 'ton-wallet-finder'` does.
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
-import chai from 'chai';
+import { expect } from 'chai';
 import * as ns from 'ton-wallet-finder';
-import pkg, { TonWalletFinder, saveResultsToFile } from 'ton-wallet-finder';
+import pkg, { TonWalletFinder, saveResultsToFile, decryptResults } from 'ton-wallet-finder';
 
-const { expect } = chai;
 
 describe('ESM import', () => {
     it('should expose named exports', () => {
         expect(TonWalletFinder).to.be.a('function');
         expect(saveResultsToFile).to.be.a('function');
+        expect(decryptResults).to.be.a('function');
     });
 
     it('should expose the same API on the default export', () => {
