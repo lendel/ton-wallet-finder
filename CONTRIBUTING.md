@@ -70,11 +70,36 @@ Tests live in `test/` (Mocha + Chai + Sinon):
 
 ## Pull Request Process
 
-1. Fork the repository and create a feature branch
+1. Fork the repository and create a branch named as below
 2. Write tests for your changes
 3. Ensure `npm run check` passes
 4. Update `CHANGELOG.md` under `[Unreleased]`
-5. Open a PR against `master`
+5. Open a PR against `master`; the branch is deleted after merge
+
+### Branch names
+
+`<type>/<short-description>` in lowercase kebab-case, where `<type>` matches the
+[Conventional Commits](https://www.conventionalcommits.org/) type of the change:
+
+| Prefix | Use for | Example |
+|--------|---------|---------|
+| `feat/` | New features | `feat/encrypted-results` |
+| `fix/` | Bug fixes | `fix/worker-threadpool-cap` |
+| `perf/` | Performance work | `perf/main-thread-concurrency` |
+| `docs/` | Documentation only | `docs/readme-performance-table` |
+| `refactor/` | Code changes with no behaviour change | `refactor/split-lib-modules` |
+| `test/` | Tests only | `test/encryption-tampering` |
+| `ci/` | Workflows, Dependabot | `ci/codeql` |
+| `chore/` | Tooling, dependencies, housekeeping | `chore/bump-eslint` |
+| `release/` | Release preparation | `release/v6.0.0` |
+
+Add an issue number when there is one: `fix/123-abort-latency`. Branches created by bots
+(`dependabot/…`) keep their own naming.
+
+### Commit messages
+
+[Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`, with
+`!` or a `BREAKING CHANGE:` footer for breaking changes (`build!: require Node.js 22`).
 
 ---
 
