@@ -22,7 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The mnemonic and keys are printed only with `--show`. If saving fails, they are printed
     instead, so a found wallet is never lost.
   - `--decrypt <file>` prints the wallet stored in an encrypted file.
-  - `--password-env <VAR>` for scripts; `--wallet`, `--workers` (default `auto`), `--output`,
+  - `--wallet` defaults to **`v5r1`** (W5), the current standard in Tonkeeper and Telegram
+    Wallet. The library default stays `'v4r2'`, so existing code derives the same addresses.
+  - `--password-env <VAR>` for scripts; `--workers` (default `auto`), `--output`,
     `--quiet`, `--help`, `--version`.
   - Live progress on stderr (attempts, speed, elapsed, expected time). Ctrl+C stops cleanly
     with exit code 130; exit codes are `0` found, `1` error, `2` invalid usage.

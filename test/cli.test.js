@@ -138,7 +138,8 @@ describe('CLI', function () {
     describe('helpers', () => {
         it('parseCli applies the defaults', () => {
             const o = parseCli(['abc']);
-            expect(o).to.include({ ending: 'abc', wallet: 'v4r2', workers: 'auto', encrypt: true, save: true });
+            expect(o).to.include({ ending: 'abc', wallet: 'v5r1', workers: 'auto', encrypt: true, save: true });
+            expect(parseCli(['abc', '-w', 'v4r2']).wallet).to.equal('v4r2');
             expect(parseCli(['abc', '--plain']).encrypt).to.equal(false);
             expect(parseCli(['abc', '-j', '3']).workers).to.equal(3);
         });
