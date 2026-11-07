@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Parallel search did not scale past 4 workers.** Worker threads called the async
+  `crypto.pbkdf2()`, which runs on libuv's *process-wide* thread pool (4 threads by default,
+  `UV_THREADPOOL_SIZE`), so every worker queued its PBKDF2 work into the same 4 slots.
+  On a machine with more than 4 cores, `workers: 'auto'` was no faster than `workers: 4`.
+  Workers now use synchronous PBKDF2 in their own thread; throughput no longer depends on
+  `UV_THREADPOOL_SIZE` (measured: 4 workers with a 1-thread pool went from ~12 to ~41
+  addresses/s). The single-threaded path (`workers: 1`) still uses the async API so the
+  event loop stays responsive. Derived addresses are unchanged.
+
+### Added
+- `_internals.mnemonicNewSync`, `_internals.mnemonicToPrivateKeySync`,
+  `_internals.isBasicSeedSync` — synchronous variants used by the worker threads, checked
+  against the same reference vector.
+
+### Changed
+- Dev dependencies: eslint 10.14.0, mocha 12.0.3, sinon 22.1.0; `overrides` pin
+  `glob` ≥ 14.0.4 and `minimatch` ≥ 11.0.5 to clear dev-only advisories
+  (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249). `npm audit` is clean. The published package
+  still has zero runtime dependencies.
+- `SECURITY.md`: supported-versions table updated to 5.x.
+- Added Dependabot config for npm and GitHub Actions (weekly, grouped).
+
 ---
 
 ## [5.1.1] — 2026-09-06

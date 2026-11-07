@@ -4,7 +4,9 @@ const { expect } = require('chai');
 const { _internals } = require('../index');
 
 const {
-    mnemonicToPrivateKey, isBasicSeed,
+    mnemonicNew, mnemonicNewSync,
+    mnemonicToPrivateKey, mnemonicToPrivateKeySync,
+    isBasicSeed, isBasicSeedSync,
     walletAddress, walletV3R2Address, walletV4Address, walletV5R1Address,
     cellHash, padBits, crc16,
 } = _internals;
@@ -77,6 +79,30 @@ describe('crypto primitives (reference vectors)', () => {
             const swapped = VECTOR.words.slice();
             [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
             expect(await isBasicSeed(swapped)).to.equal(false);
+        });
+    });
+
+    describe('sync variants (used by worker threads)', () => {
+        it('mnemonicToPrivateKeySync() should match the reference vector', function () {
+            this.timeout(10000);
+            const { publicKey, secretKey } = mnemonicToPrivateKeySync(VECTOR.words);
+            expect(publicKey.toString('hex')).to.equal(VECTOR.publicKey);
+            expect(secretKey.subarray(32).toString('hex')).to.equal(VECTOR.publicKey);
+        });
+
+        it('isBasicSeedSync() should agree with isBasicSeed()', async () => {
+            const swapped = VECTOR.words.slice();
+            [swapped[0], swapped[1]] = [swapped[1], swapped[0]];
+            expect(isBasicSeedSync(VECTOR.words)).to.equal(true);
+            expect(isBasicSeedSync(swapped)).to.equal(await isBasicSeed(swapped));
+        });
+
+        it('mnemonicNewSync() and mnemonicNew() should return 24 words passing the seed check', async function () {
+            this.timeout(20000);
+            for (const words of [mnemonicNewSync(), await mnemonicNew()]) {
+                expect(words).to.have.lengthOf(24);
+                expect(isBasicSeedSync(words)).to.equal(true);
+            }
         });
     });
 

@@ -53,15 +53,42 @@ function pbkdf2Sha512(password, salt, iterations, keylen) {
     );
 }
 
+function pbkdf2Sha512Sync(password, salt, iterations, keylen) {
+    return crypto.pbkdf2Sync(password, salt, iterations, keylen, 'sha512');
+}
+
+// TON mnemonic parameters (mirror tonlib / @ton/crypto).
+const SEED_VERSION_SALT       = 'TON seed version';
+const SEED_VERSION_ITERATIONS = Math.max(1, Math.floor(100000 / 256)); // 390
+const DEFAULT_SEED_SALT       = 'TON default seed';
+const DEFAULT_SEED_ITERATIONS = 100000;
+const MNEMONIC_WORDS          = 24;
+
+/** Draw 24 uniformly random words. 2 bytes per word; 65536 / 2048 = 32 — no modulo bias. */
+function randomWords() {
+    const n     = WORDLIST.length; // 2048
+    const buf   = crypto.randomBytes(MNEMONIC_WORDS * 2);
+    const words = new Array(MNEMONIC_WORDS);
+    for (let i = 0; i < MNEMONIC_WORDS; i++) {
+        words[i] = WORDLIST[buf.readUInt16BE(i * 2) % n];
+    }
+    return words;
+}
+
 /**
  * Check if the mnemonic array is a valid TON "basic seed" (no password).
  * Algorithm mirrors tonlib Mnemonic::is_basic_seed().
  */
 async function isBasicSeed(words) {
     const entropy = hmacSha512(words.join(' '), '');
-    const seed    = await pbkdf2Sha512(entropy, 'TON seed version',
-        Math.max(1, Math.floor(100000 / 256)), 64);
+    const seed    = await pbkdf2Sha512(entropy, SEED_VERSION_SALT, SEED_VERSION_ITERATIONS, 64);
     return seed[0] === 0;
+}
+
+/** Synchronous variant of isBasicSeed(). */
+function isBasicSeedSync(words) {
+    const entropy = hmacSha512(words.join(' '), '');
+    return pbkdf2Sha512Sync(entropy, SEED_VERSION_SALT, SEED_VERSION_ITERATIONS, 64)[0] === 0;
 }
 
 /**
@@ -69,16 +96,27 @@ async function isBasicSeed(words) {
  * Loops until the TON seed-version check passes (≈ 1 in 256 attempts).
  */
 async function mnemonicNew() {
-    const n = WORDLIST.length; // 2048
     while (true) {
-        // 2 bytes per word; 65536 / 2048 = 32 — no modulo bias.
-        const buf   = crypto.randomBytes(24 * 2);
-        const words = [];
-        for (let i = 0; i < 24; i++) {
-            words.push(WORDLIST[buf.readUInt16BE(i * 2) % n]);
-        }
+        const words = randomWords();
         if (await isBasicSeed(words)) { return words; }
     }
+}
+
+/**
+ * Synchronous variant of mnemonicNew(). Blocks the calling thread (~tens of ms),
+ * so it is meant for worker threads: the async variant runs PBKDF2 on libuv's
+ * process-wide thread pool (4 threads by default), which would cap the parallel
+ * search at 4 concurrent derivations no matter how many workers are started.
+ */
+function mnemonicNewSync() {
+    while (true) {
+        const words = randomWords();
+        if (isBasicSeedSync(words)) { return words; }
+    }
+}
+
+function normalizeWords(words) {
+    return words.map(w => w.toLowerCase().trim()).join(' ');
 }
 
 /**
@@ -86,9 +124,15 @@ async function mnemonicNew() {
  * Returns { publicKey: Buffer(32), secretKey: Buffer(64) }.
  */
 async function mnemonicToPrivateKey(words) {
-    const norm    = words.map(w => w.toLowerCase().trim());
-    const entropy = hmacSha512(norm.join(' '), '');
-    const seed64  = await pbkdf2Sha512(entropy, 'TON default seed', 100000, 64);
+    const entropy = hmacSha512(normalizeWords(words), '');
+    const seed64  = await pbkdf2Sha512(entropy, DEFAULT_SEED_SALT, DEFAULT_SEED_ITERATIONS, 64);
+    return ed25519FromSeed(seed64.subarray(0, 32));
+}
+
+/** Synchronous variant of mnemonicToPrivateKey() — see mnemonicNewSync(). */
+function mnemonicToPrivateKeySync(words) {
+    const entropy = hmacSha512(normalizeWords(words), '');
+    const seed64  = pbkdf2Sha512Sync(entropy, DEFAULT_SEED_SALT, DEFAULT_SEED_ITERATIONS, 64);
     return ed25519FromSeed(seed64.subarray(0, 32));
 }
 
@@ -614,8 +658,11 @@ module.exports = {
 // Not covered by semver guarantees yet; the public surface is the two exports above.
 module.exports._internals = {
     mnemonicNew,
+    mnemonicNewSync,
     mnemonicToPrivateKey,
+    mnemonicToPrivateKeySync,
     isBasicSeed,
+    isBasicSeedSync,
     walletAddress,
     walletV3R2Address,
     walletV4Address,
