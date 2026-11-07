@@ -68,6 +68,19 @@ Tests live in `test/` (Mocha + Chai + Sinon):
 
 ---
 
+## Documentation
+
+| File | Contents |
+|------|----------|
+| `README.md` / `README.ru.md` | What the library is, install, quick start, options, API, performance — keep both languages in sync |
+| `docs/MIGRATION.md` / `docs/MIGRATION.ru.md` | How to upgrade between major versions — add a section for every breaking release |
+| `CHANGELOG.md` | Every change, per release (English only); becomes the GitHub Release notes |
+
+The README is a landing page, not a changelog: put "what's new" in `CHANGELOG.md` and upgrade
+steps in `docs/MIGRATION.md`. Code examples in the README must run as written.
+
+---
+
 ## Pull Request Process
 
 1. Fork the repository and create a branch named as below
