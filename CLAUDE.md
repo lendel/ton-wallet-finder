@@ -24,5 +24,6 @@ Guidance for Claude Code sessions working in this repository. Human contributors
 
 - Zero runtime dependencies: only Node.js built-ins in `index.js` / `worker.js`.
 - `test/crypto.test.js` reference vectors must never be edited to make a test pass.
-- Public API changes: update `index.d.ts`, `test/types/index.test.ts`, README (EN + RU) and
+- Public API changes: update `index.d.ts`, `test/types/index.test.ts`, `README.md` + `README.ru.md`
+  (and `docs/MIGRATION*.md` for breaking changes) and
   `CHANGELOG.md` under `[Unreleased]`.
