@@ -12,9 +12,10 @@ cd ton-wallet-finder
 npm install
 ```
 
-**Requirements:** Node.js 20 or higher (matches `engines` in `package.json`). Develop on
-Node.js 22 or 24 (LTS); CI runs the suite on 20, 22, 24 and 26. Node.js 20 is end-of-life
-(30 April 2026) and is kept only until the next major release.
+**Requirements:** Node.js 22.12 or higher for development (the test suite loads the ESM-only
+`chai` through `require()`); the library itself supports Node.js 22+. `.nvmrc` pins the
+recommended version (`nvm use`). CI runs the tests on Node.js 22, 24 and 26 on Linux, plus
+Node.js 24 on macOS and Windows.
 
 ---
 
@@ -23,7 +24,11 @@ Node.js 22 or 24 (LTS); CI runs the suite on 20, 22, 24 and 26. Node.js 20 is en
 | Command | Description |
 |---------|-------------|
 | `npm test` | Run the full test suite (Mocha) |
-| `npm run lint` | Run ESLint on `index.js`, `worker.js` and `test/` |
+| `npm run lint` | Run ESLint on the repository |
+| `npm run typecheck` | Compile-check `index.d.ts` against `test/types/index.test.ts` (TypeScript) |
+| `npm run coverage` | Run the tests under c8 with coverage thresholds (`.c8rc.json`) |
+| `npm run pack:check` | List exactly what would be published to npm |
+| `npm run check` | Lint + typecheck + coverage — what CI runs; run it before every PR |
 
 ---
 
@@ -44,16 +49,14 @@ Tests live in `test/` (Mocha + Chai + Sinon):
 | `TonWalletFinder.test.js` | Constructor validation, single-threaded search, cancellation, `saveResultsToFile` |
 | `workers.test.js` | Worker-thread pool (deterministic fake workers + real-thread integration) |
 | `crypto.test.js` | Reference vectors for mnemonic → key → address, `cellHash`, `padBits`, `crc16` |
+| `encryption.test.js` | Encrypted results: round-trip, wrong password, tampering, file output |
 | `esm.test.mjs` | Package is importable from ES modules through the `exports` map |
+| `types/index.test.ts` | Type-level test of `index.d.ts` (compiled, never executed) |
 
 - Every new feature or bug fix must include a corresponding test
 - All stubs must be restored (use `try/finally` with `stub.restore()`)
+- Tests that write real files must do so in a temporary directory (see `encryption.test.js`)
 - Tests that involve real key generation carry `this.timeout(60000)` — this is intentional
-
-### Dev-dependency note: Chai v4
-
-`chai` is intentionally pinned to `4.3.7` and **must not be upgraded to v5+**.
-Chai v5 dropped CommonJS support. Since this package is a pure CJS library and does not use ESM, upgrading chai would break the test suite without any benefit.
 
 ### Reference vectors
 
@@ -69,7 +72,7 @@ Chai v5 dropped CommonJS support. Since this package is a pure CJS library and d
 
 1. Fork the repository and create a feature branch
 2. Write tests for your changes
-3. Ensure `npm run lint` and `npm test` both pass
+3. Ensure `npm run check` passes
 4. Update `CHANGELOG.md` under `[Unreleased]`
 5. Open a PR against `master`
 
@@ -96,7 +99,7 @@ Releases are published by CI only (`.github/workflows/publish.yml`), never from 
    ```sh
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-3. The workflow checks that the tag matches `package.json`, runs lint + tests on
+3. The workflow checks that the tag matches `package.json`, runs `npm run check` on
    Node.js 24, then `npm publish --provenance`.
 
 ### Authentication: npm trusted publishing (OIDC)
@@ -120,6 +123,10 @@ cause and either move the tag to the fixed commit and push it again, or start th
 workflow manually from the *Actions* tab (**Run workflow**) on `master`.
 
 ---
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
 
 ## Security
 

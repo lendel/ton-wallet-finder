@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 5.x     | yes       |
+| 6.x     | yes       |
+| 5.x     | critical security fixes only |
 | < 5.0   | no        |
 
 ## Reporting a vulnerability
@@ -30,6 +31,11 @@ at <https://github.com/lendel>. You should receive an acknowledgement within
   `ton_wallet_results.txt` in the current working directory, with file mode
   `0600`. Existing files are never overwritten. Move the key into a wallet and
   delete the file as soon as possible.
+- With `saveResult: { password }` the file (`ton_wallet_results.enc.json`) is
+  encrypted with AES-256-GCM under a key derived by scrypt (N = 2^17, r = 8,
+  p = 1, random salt). Its strength depends entirely on the password. Never put
+  the password in source code or command-line arguments (they end up in shell
+  history and process lists) — read it from a prompt or a secret store.
 - JavaScript offers no way to reliably zero memory, so key material may remain
   in process memory until garbage collection.
 

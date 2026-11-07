@@ -9,28 +9,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- **Parallel search did not scale past 4 workers.** Worker threads called the async
-  `crypto.pbkdf2()`, which runs on libuv's *process-wide* thread pool (4 threads by default,
-  `UV_THREADPOOL_SIZE`), so every worker queued its PBKDF2 work into the same 4 slots.
-  On a machine with more than 4 cores, `workers: 'auto'` was no faster than `workers: 4`.
-  Workers now use synchronous PBKDF2 in their own thread; throughput no longer depends on
-  `UV_THREADPOOL_SIZE` (measured: 4 workers with a 1-thread pool went from ~12 to ~41
-  addresses/s). The single-threaded path (`workers: 1`) still uses the async API so the
-  event loop stays responsive. Derived addresses are unchanged.
+---
+
+## [6.0.0] — 2026-11-07
+
+### ⚠️ Breaking
+- **Node.js 22 or newer is required** (`engines: ">=22"`). Node.js 20 reached end-of-life on
+  2026-04-30. Nothing else in the public API changed: addresses, defaults and result shapes
+  are identical to 5.x.
+- `workers: 1` (the default) now runs several attempts concurrently on the main thread, so it
+  uses up to 4 CPU cores through libuv's thread pool instead of one. Set
+  `UV_THREADPOOL_SIZE=1` to get the old single-core behaviour.
 
 ### Added
+- **Encrypted results.** `saveResult: { password, fileName? }` writes an encrypted
+  `ton_wallet_results.enc.json`; `saveResultsToFile()` accepts `{ fileName, password }` as its
+  5th argument (a plain filename string still works). Key derivation: scrypt (N = 2^17, r = 8,
+  p = 1, 16-byte random salt); cipher: AES-256-GCM (12-byte random IV, header bound as AAD);
+  Node.js built-ins only. The file holds no secret — not even the address — in the clear.
+- `decryptResults(data, password)` — reads an encrypted results file back. Bounds-checks the
+  scrypt parameters so a crafted file cannot exhaust memory.
+- `saveResult` is validated at construction (`TypeError` on a bad value, empty password or a
+  `fileName` with path separators).
 - `_internals.mnemonicNewSync`, `_internals.mnemonicToPrivateKeySync`,
-  `_internals.isBasicSeedSync` — synchronous variants used by the worker threads, checked
-  against the same reference vector.
+  `_internals.isBasicSeedSync`, `_internals.encryptResults`.
+- TypeScript: `SaveOptions`, `decryptResults`, and a type-level test (`npm run typecheck`).
+
+### Fixed
+- **Parallel search did not scale past 4 workers.** Worker threads called the async
+  `crypto.pbkdf2()`, which runs on libuv's *process-wide* thread pool (4 threads by default),
+  so every worker queued into the same 4 slots and `workers: 'auto'` on an 8+-core machine was
+  no faster than `workers: 4`. Workers now use synchronous PBKDF2 in their own thread
+  (measured: 4 workers with a 1-thread pool went from ~12 to ~41 addresses/s).
+
+### Performance
+- Single-threaded search (`workers: 1`): ~10 → ~38 addresses/s on a 4-vCPU machine.
+- Aborting a single-threaded search now rejects immediately instead of after the attempt in
+  flight finishes.
 
 ### Changed
-- Dev dependencies: eslint 10.14.0, mocha 12.0.3, sinon 22.1.0; `overrides` pin
-  `glob` ≥ 14.0.4 and `minimatch` ≥ 11.0.5 to clear dev-only advisories
-  (GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249). `npm audit` is clean. The published package
-  still has zero runtime dependencies.
-- `SECURITY.md`: supported-versions table updated to 5.x.
-- Added Dependabot config for npm and GitHub Actions (weekly, grouped).
+- Dev tooling: chai 6, eslint 10.14, mocha 12.0.3, sinon 22, c8 (coverage with thresholds),
+  TypeScript (declaration checks); `overrides` pin `glob`/`minimatch` to patched versions.
+  `npm audit` is clean. The package still has zero runtime dependencies.
+- `Readme.md` renamed to `README.md`.
+
+### Repository
+- CI: lint, typecheck, coverage, `npm pack --dry-run` and `npm audit`; tests on Node.js
+  22/24/26 (Linux) and 24 (macOS, Windows); workflow-level least-privilege permissions,
+  concurrency groups, `persist-credentials: false`. All actions bumped and pinned to commit SHAs.
+- New: CodeQL workflow, Dependabot (npm + GitHub Actions), `CODE_OF_CONDUCT.md`
+  (Contributor Covenant 2.1), issue forms, PR template, `CODEOWNERS`, `FUNDING.yml`,
+  `.gitattributes`, `.nvmrc`.
+- `SECURITY.md`: 6.x supported; documents the encrypted output.
 
 ---
 
