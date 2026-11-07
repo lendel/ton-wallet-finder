@@ -25,8 +25,10 @@ export type WalletVersion = 'v3r2' | 'v4r2' | 'v5r1';
  */
 export interface SaveOptions {
     /**
-     * Encrypt the file with this password (scrypt N=2^17 + AES-256-GCM). Must be non-empty.
-     * Without it the file is written as plain text.
+     * Encrypt the file with this password (scrypt N=2^17 + AES-256-GCM). Must be a non-empty
+     * string. Omit the key entirely for plain-text output: if the key is present with any other
+     * value (e.g. `undefined` from an unset environment variable), the constructor throws a
+     * `TypeError` and `saveResultsToFile()` writes nothing.
      */
     readonly password?: string;
     /**

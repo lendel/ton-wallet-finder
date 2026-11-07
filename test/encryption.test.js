@@ -139,6 +139,29 @@ describe('encrypted results', function () {
             expect(fs.readFileSync(file, 'utf8')).to.include(`Private Key: ${RESULT.privateKey}`);
         });
 
+        // Regression: `{ password: process.env.UNSET }` used to fall back to plain text.
+        for (const [label, password] of [['undefined', undefined], ['null', null], ['a number', 1234]]) {
+            it(`should refuse to write anything when password is ${label}`, async () => {
+                const errStub = sinon.stub(console, 'error');
+                try {
+                    const file = await saveResultsToFile(RESULT.publicKey, RESULT.privateKey, RESULT.words,
+                        RESULT.walletAddress, { password });
+                    expect(file).to.equal(undefined);
+                    expect(fs.readdirSync(tmpDir)).to.have.lengthOf(0);
+                    expect(errStub.calledOnce).to.equal(true);
+                } finally {
+                    errStub.restore();
+                }
+            });
+        }
+
+        it('should still write plain text when the options object has no password key', async () => {
+            const file = await saveResultsToFile(RESULT.publicKey, RESULT.privateKey, RESULT.words,
+                RESULT.walletAddress, { fileName: 'plain.txt' });
+            expect(path.basename(file)).to.equal('plain.txt');
+            expect(fs.readFileSync(file, 'utf8')).to.include(`Private Key: ${RESULT.privateKey}`);
+        });
+
         it('should return undefined on an empty password', async () => {
             const errStub = sinon.stub(console, 'error');
             try {
@@ -155,6 +178,11 @@ describe('encrypted results', function () {
     describe('TonWalletFinder saveResult option', () => {
         it('should validate saveResult at construction', () => {
             expect(() => new TonWalletFinder('A', { saveResult: { password: '' } })).to.throw(TypeError);
+            // Regression: a missing env var must not silently switch to plain-text output.
+            expect(() => new TonWalletFinder('A', { saveResult: { password: undefined } }))
+                .to.throw(TypeError, /saveResult\.password.*got undefined/);
+            expect(() => new TonWalletFinder('A', { saveResult: { password: null } })).to.throw(TypeError);
+            expect(() => new TonWalletFinder('A', { saveResult: { fileName: 'x.txt' } })).to.not.throw();
             expect(() => new TonWalletFinder('A', { saveResult: { fileName: '../x' } })).to.throw(TypeError);
             expect(() => new TonWalletFinder('A', { saveResult: 'yes' })).to.throw(TypeError);
             expect(() => new TonWalletFinder('A', { saveResult: { password: 'pw' } })).to.not.throw();

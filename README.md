@@ -128,7 +128,9 @@ instead of retrying forever.
 
 Writes a result to the **current working directory** with file mode `0600` — this is what
 `saveResult` uses. `options` is a plain file name or `{ fileName?, password? }`; with a
-password the file is encrypted. Never overwrites (adds a numeric suffix), rejects path
+password the file is encrypted — and if the `password` key is present but empty or
+`undefined` (say, an unset environment variable), nothing is written: there is no silent
+fall-back to plain text. Never overwrites (adds a numeric suffix), rejects path
 separators in `fileName`, and resolves with the absolute path written — or `undefined` if
 writing failed (the error is logged, never thrown).
 
