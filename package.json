@@ -36,7 +36,11 @@
     },
     {
       "type": "ko_fi",
-      "url": "https://ko-fi.com/lendelkz"
+      "url": "https://ko-fi.com/voanerges"
+    },
+    {
+      "type": "buymeacoffee",
+      "url": "https://www.buymeacoffee.com/voanerges"
     }
   ],
   "license": "MIT",
