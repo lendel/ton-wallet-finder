@@ -775,7 +775,13 @@ function validateSaveResult(saveResult) {
         throw new TypeError(`Invalid saveResult option: expected a boolean or { password, fileName }, got ${JSON.stringify(saveResult)}.`);
     }
     const { password, fileName } = saveResult;
-    if (password !== undefined) { assertPassword(password); }
+    // Key presence, not value, decides: `{ password: process.env.UNSET }` must fail loudly
+    // instead of silently writing the keys as plain text.
+    if (Object.hasOwn(saveResult, 'password') && (typeof password !== 'string' || password.length === 0)) {
+        const got = password === undefined ? 'undefined' : JSON.stringify(password);
+        throw new TypeError(`Invalid saveResult.password: expected a non-empty string, got ${got}. ` +
+            'Omit the password key to save as plain text.');
+    }
     if (fileName !== undefined && !isPlainFileName(fileName)) {
         throw new TypeError('Invalid saveResult.fileName: must be a plain filename without path separators.');
     }
@@ -794,6 +800,8 @@ function isPlainFileName(fileName) {
  *
  * With `options.password` the content is encrypted (scrypt + AES-256-GCM) and the
  * default filename is `ton_wallet_results.enc.json`; read it back with `decryptResults()`.
+ * If the `password` key is present but not a non-empty string (e.g. an unset environment
+ * variable), nothing is written and `undefined` is returned.
  *
  * @param {string}          publicKey
  * @param {string}          privateKey
@@ -811,7 +819,9 @@ async function saveResultsToFile(publicKey, privateKey, words, walletAddress, op
 
     const opts = typeof options === 'string' ? { fileName: options } : (options ?? {});
     const { password } = opts;
-    const encrypt  = password !== undefined;
+    // Any `password` key means "encrypt": an undefined/empty value is an error below,
+    // never a silent fall-back to plain text.
+    const encrypt  = Object.hasOwn(opts, 'password');
     const fileName = opts.fileName ?? (encrypt ? ENCRYPTED_RESULTS_FILE : PLAIN_RESULTS_FILE);
 
     // Path traversal guard — fileName must be a plain filename, not a path.

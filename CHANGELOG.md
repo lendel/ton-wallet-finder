@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [6.0.1] — 2026-11-07
+
+### Security
+- **A missing password no longer falls back to plain text.** `saveResult: { password }` and
+  `saveResultsToFile(..., { password })` decided whether to encrypt by the password's *value*,
+  so `{ password: process.env.WALLET_FILE_PASSWORD }` with the variable unset became
+  `{ password: undefined }` and silently wrote the private key and mnemonic **unencrypted** to
+  `ton_wallet_results.txt`. Now the presence of the `password` key decides: if it is there, it
+  must be a non-empty string.
+  - The constructor throws a `TypeError` ("Invalid saveResult.password: expected a non-empty
+    string, got undefined…").
+  - `saveResultsToFile()` logs the error, writes nothing and resolves with `undefined`.
+  - To save as plain text on purpose, omit the `password` key (or use `saveResult: true`).
+
+  Affected: 6.0.0. If you used `saveResult: { password: … }`, check your working directory for
+  an unexpected `ton_wallet_results*.txt` file, and move the funds of any wallet found in one
+  to a new wallet if that machine is not fully trusted.
+
 ## [6.0.0] — 2026-11-07
 
 ### ⚠️ Breaking
