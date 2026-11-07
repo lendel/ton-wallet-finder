@@ -2,6 +2,7 @@
 
 const { expect } = require('chai');
 const { _internals } = require('../index');
+const WORDLIST = require('../wordlist');
 
 const {
     mnemonicNew, mnemonicNewSync,
@@ -101,6 +102,7 @@ describe('crypto primitives (reference vectors)', () => {
             this.timeout(20000);
             for (const words of [mnemonicNewSync(), await mnemonicNew()]) {
                 expect(words).to.have.lengthOf(24);
+                expect(words.every(w => WORDLIST.includes(w))).to.equal(true);
                 expect(isBasicSeedSync(words)).to.equal(true);
             }
         });

@@ -64,13 +64,11 @@ const DEFAULT_SEED_SALT       = 'TON default seed';
 const DEFAULT_SEED_ITERATIONS = 100000;
 const MNEMONIC_WORDS          = 24;
 
-/** Draw 24 uniformly random words. 2 bytes per word; 65536 / 2048 = 32 — no modulo bias. */
+/** Draw 24 uniformly random words from the 2048-word list (CSPRNG, unbiased by construction). */
 function randomWords() {
-    const n     = WORDLIST.length; // 2048
-    const buf   = crypto.randomBytes(MNEMONIC_WORDS * 2);
     const words = new Array(MNEMONIC_WORDS);
     for (let i = 0; i < MNEMONIC_WORDS; i++) {
-        words[i] = WORDLIST[buf.readUInt16BE(i * 2) % n];
+        words[i] = WORDLIST[crypto.randomInt(WORDLIST.length)];
     }
     return words;
 }
