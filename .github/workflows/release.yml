@@ -1,0 +1,77 @@
+name: GitHub Release
+
+# Creates the GitHub Release for a version tag once "Publish to npm" has succeeded
+# for it. The release notes are that version's section of CHANGELOG.md.
+# Run it manually (Actions → GitHub Release → Run workflow) for a tag that has
+# already been published, e.g. to backfill a missing release.
+on:
+  workflow_run:
+    workflows: ["Publish to npm"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing version tag, e.g. v6.0.0"
+        required: true
+
+permissions: {}
+
+jobs:
+  release:
+    name: Create GitHub Release
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write   # create the release
+    env:
+      # Passed through env, never interpolated into the script (injection-safe).
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.workflow_run.head_branch }}
+    steps:
+      - name: Validate tag
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Not a version tag: $TAG"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          VERSION="${TAG#v}"
+          {
+            printf '```sh\nnpm install ton-wallet-finder@%s\n```\n\n' "$VERSION"
+            awk -v ver="$VERSION" '
+              index($0, "## [" ver "]") == 1 { found = 1; next }
+              found && /^## \[/              { exit }
+              found                          { print }
+            ' CHANGELOG.md | sed '/^---$/d'
+            printf '\n**Full changelog:** [CHANGELOG.md](%s/%s/blob/%s/CHANGELOG.md)\n' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$TAG"
+          } > notes.md
+          if ! grep -q '[^[:space:]]' <(sed '1,4d' notes.md); then
+            echo "::error::CHANGELOG.md has no section for $VERSION"
+            exit 1
+          fi
+          cat notes.md
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, nothing to do."
+            exit 0
+          fi
+          prerelease=()
+          [[ "$TAG" == *-* ]] && prerelease=(--prerelease)
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$TAG" --notes-file notes.md "${prerelease[@]}"

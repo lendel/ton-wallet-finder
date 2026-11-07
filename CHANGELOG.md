@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Single-threaded search (`workers: 1`): ~10 → ~38 addresses/s on a 4-vCPU machine.
 - Aborting a single-threaded search now rejects immediately instead of after the attempt in
   flight finishes.
+- Mnemonic words are drawn with `crypto.randomInt` (unbiased by construction). The previous
+  16-bit `% 2048` had no actual bias, but CodeQL flagged it (`js/biased-cryptographic-random`).
 
 ### Changed
 - Dev tooling: chai 6, eslint 10.14, mocha 12.0.3, sinon 22, c8 (coverage with thresholds),

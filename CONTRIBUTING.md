@@ -126,6 +126,10 @@ Releases are published by CI only (`.github/workflows/publish.yml`), never from 
    ```
 3. The workflow checks that the tag matches `package.json`, runs `npm run check` on
    Node.js 24, then `npm publish --provenance`.
+4. When the publish succeeds, `.github/workflows/release.yml` creates the GitHub Release
+   for the tag, with that version's `CHANGELOG.md` section as the notes — so write the
+   changelog entry with release readers in mind. To create a missing release for an
+   already published tag, run **GitHub Release** manually from the *Actions* tab with the tag.
 
 ### Authentication: npm trusted publishing (OIDC)
 
