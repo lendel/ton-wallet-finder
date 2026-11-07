@@ -1,6 +1,6 @@
 {
   "all": true,
-  "include": ["index.js", "worker.js"],
+  "include": ["index.js", "worker.js", "cli.js"],
   "reporter": ["text", "lcov"],
   "check-coverage": true,
   "lines": 90,

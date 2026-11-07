@@ -42,7 +42,7 @@ module.exports = [
         ignores: ['coverage/**', 'node_modules/**'],
     },
     {
-        files: ['index.js', 'worker.js', 'eslint.config.js'],
+        files: ['index.js', 'worker.js', 'cli.js', 'eslint.config.js'],
         languageOptions: {
             ecmaVersion: 2022,
             sourceType:  'commonjs',

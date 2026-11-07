@@ -36,6 +36,10 @@ at <https://github.com/lendel>. You should receive an acknowledgement within
   p = 1, random salt). Its strength depends entirely on the password. Never put
   the password in source code or command-line arguments (they end up in shell
   history and process lists) — read it from a prompt or a secret store.
+- The command-line tool (`npx ton-wallet-finder`) saves an encrypted file by default, asks for
+  the password on the terminal without echoing it (or reads it from `--password-env`, never
+  from a command-line argument), and prints the mnemonic and keys only with `--show` — or
+  when saving the file failed, so that a found wallet is never lost.
 - JavaScript offers no way to reliably zero memory, so key material may remain
   in process memory until garbage collection.
 

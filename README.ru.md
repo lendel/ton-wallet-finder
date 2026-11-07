@@ -8,8 +8,9 @@
 [![license](https://img.shields.io/npm/l/ton-wallet-finder?color=green&style=flat-square)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lendel/ton-wallet-finder/badge?style=flat-square)](https://scorecard.dev/viewer/?uri=github.com/lendel/ton-wallet-finder)
 
-**Генератор красивых адресов для блокчейна TON.** Создаёт новые кошельки, пока не найдёт
-тот, чей адрес заканчивается на выбранную вами строку — например, `EQ…cafe`.
+**Генератор красивых адресов для блокчейна TON** — консольная программа и библиотека для
+Node.js. Создаёт новые кошельки, пока не найдёт тот, чей адрес заканчивается на выбранную вами
+строку — например, `EQ…cafe`.
 
 [English](README.md) · **Русский**
 
@@ -39,12 +40,41 @@
 ## Установка
 
 ```sh
-npm install ton-wallet-finder
+npm install ton-wallet-finder        # как библиотеку
+npx ton-wallet-finder --help         # или запустить консольную программу без установки
 ```
 
 Требуется **Node.js 22** или новее.
 
-## Быстрый старт
+## Командная строка
+
+```sh
+npx ton-wallet-finder abc --wallet v5r1
+```
+
+Программа спрашивает пароль **до** начала поиска, показывает прогресс (число попыток, скорость,
+ожидаемое время) и сохраняет результат в зашифрованный `ton_wallet_results.enc.json`. Мнемоника
+на экран не выводится, если не указать `--show`. Прочитать файл потом можно так:
+
+```sh
+npx ton-wallet-finder --decrypt ton_wallet_results.enc.json
+```
+
+| Опция | Описание |
+|---|---|
+| `-w, --wallet <v3r2\|v4r2\|v5r1>` | Контракт кошелька (по умолчанию `v4r2`); должен совпадать с вашим приложением — Tonkeeper и Telegram Wallet используют `v5r1` |
+| `-j, --workers <n\|auto>` | Число потоков (по умолчанию `auto` — по одному на ядро) |
+| `-o, --output <file>` | Имя файла в текущей директории |
+| `--password-env <VAR>` | Брать пароль из переменной окружения, а не спрашивать (для скриптов) |
+| `--plain` | Сохранить открытым текстом, без шифрования |
+| `--no-save --show` | Только вывести результат, файл не создавать |
+| `--decrypt <file>` | Показать кошелёк из зашифрованного файла |
+| `-q, --quiet` | Без строки прогресса |
+
+Ctrl+C корректно останавливает поиск (код возврата 130). Коды возврата: `0` — найдено, `1` — ошибка,
+`2` — неверные аргументы. Полный список — `npx ton-wallet-finder --help`.
+
+## Библиотека: быстрый старт
 
 ```js
 import { TonWalletFinder } from 'ton-wallet-finder';
@@ -109,7 +139,8 @@ new TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers
 | `privateKey` | `string` | Секретный ключ Ed25519 (seed ‖ публичный ключ), hex |
 
 `options.signal` отменяет поиск, `options.workers` переопределяет `workers` из конструктора
-для этого вызова:
+для этого вызова, а `options.onProgress(attempts)` вызывается после каждой попытки с общим
+числом попыток по всем потокам (для индикатора прогресса):
 
 ```js
 const controller = new AbortController();

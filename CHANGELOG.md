@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [6.1.0] — 2026-11-07
+
+### Added
+- **Command-line tool.** `npx ton-wallet-finder <ending> [options]` — no install, no new
+  dependencies (`util.parseArgs` and a raw-mode TTY prompt from Node.js built-ins).
+  - Asks for the file password before the search (hidden input, typed twice, at least
+    8 characters) and saves an encrypted `ton_wallet_results.enc.json` by default;
+    `--plain` saves plain text, `--no-save --show` writes nothing.
+  - The mnemonic and keys are printed only with `--show`. If saving fails, they are printed
+    instead, so a found wallet is never lost.
+  - `--decrypt <file>` prints the wallet stored in an encrypted file.
+  - `--password-env <VAR>` for scripts; `--wallet`, `--workers` (default `auto`), `--output`,
+    `--quiet`, `--help`, `--version`.
+  - Live progress on stderr (attempts, speed, elapsed, expected time). Ctrl+C stops cleanly
+    with exit code 130; exit codes are `0` found, `1` error, `2` invalid usage.
+- `findWalletWithEnding({ onProgress })`: called after every attempted address with the running
+  total across all workers. A throwing callback rejects the search.
+
+### Changed
+- Worker progress messages are now logged as `Trying address:` only when `showProcess` is on
+  (they were only sent in that case before, so the output is unchanged).
+
 ## [6.0.1] — 2026-11-07
 
 ### Security

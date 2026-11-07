@@ -50,6 +50,7 @@ Tests live in `test/` (Mocha + Chai + Sinon):
 | `workers.test.js` | Worker-thread pool (deterministic fake workers + real-thread integration) |
 | `crypto.test.js` | Reference vectors for mnemonic → key → address, `cellHash`, `padBits`, `crc16` |
 | `encryption.test.js` | Encrypted results: round-trip, wrong password, tampering, file output |
+| `cli.test.js` | Command-line tool, run as a real child process: arguments, saving, `--decrypt`, Ctrl+C |
 | `esm.test.mjs` | Package is importable from ES modules through the `exports` map |
 | `types/index.test.ts` | Type-level test of `index.d.ts` (compiled, never executed) |
 
