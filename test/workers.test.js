@@ -108,7 +108,9 @@ describe('findWalletWithEnding({ workers })', () => {
         it('should spawn exactly `workers` workers with targetEnding, showProcess and walletVersion', async () => {
             const p = finder.findWalletWithEnding({ workers: 3 });
             expect(spawned).to.have.lengthOf(3);
-            expect(spawned[0].workerData).to.deep.equal({ targetEnding: 'A', showProcess: false, walletVersion: 'v4r2' });
+            expect(spawned[0].workerData).to.deep.equal({
+                targetEnding: 'A', showProcess: false, walletVersion: 'v4r2', reportProgress: false,
+            });
             spawned[1].emit('message', {
                 type: 'found', publicKey: Buffer.alloc(32, 1), secretKey: Buffer.alloc(64, 2),
                 words: Array(24).fill('abandon'), address: 'EQ' + 'A'.repeat(46),
@@ -150,6 +152,31 @@ describe('findWalletWithEnding({ workers })', () => {
             const trying = logStub.getCalls().filter(c => c.args[0] === 'Trying address:');
             expect(trying).to.have.lengthOf(1);
             expect(trying[0].args[1]).to.equal('EQxyz');
+        });
+
+        it('should count progress across all workers and pass reportProgress to them', async () => {
+            const counts = [];
+            const logStub = sinon.stub(console, 'log');
+            const p = finder.findWalletWithEnding({ workers: 2, onProgress: n => counts.push(n) });
+            expect(spawned[0].workerData.reportProgress).to.equal(true);
+            spawned[0].emit('message', { type: 'trying', address: 'EQ1' });
+            spawned[1].emit('message', { type: 'trying', address: 'EQ2' });
+            spawned[0].emit('message', { type: 'trying', address: 'EQ3' });
+            spawned[1].emit('message', { type: 'found', publicKey: new Uint8Array(32), secretKey: new Uint8Array(64), words: [], address: 'EQA' });
+            await p;
+            expect(counts).to.deep.equal([1, 2, 3]);
+            // showProcess is false: progress messages must not be logged.
+            expect(logStub.getCalls().filter(c => c.args[0] === 'Trying address:')).to.have.lengthOf(0);
+        });
+
+        it('should reject and terminate workers when onProgress throws', async () => {
+            const boom = new Error('progress UI crashed');
+            const p = finder.findWalletWithEnding({ workers: 2, onProgress: () => { throw boom; } });
+            spawned[0].emit('message', { type: 'trying', address: 'EQ1' });
+            let err;
+            try { await p; } catch (e) { err = e; }
+            expect(err).to.equal(boom);
+            for (const w of spawned) { expect(w.terminated).to.equal(true); }
         });
 
         it('should reject and terminate all workers when a worker reports a persistent error', async () => {

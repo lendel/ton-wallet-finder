@@ -426,6 +426,9 @@ class TonWalletFinder {
      *
      * @param {object}      [options={}]     - Optional configuration.
      * @param {AbortSignal} [options.signal]  - Optional AbortSignal to cancel the search.
+     * @param {(attempts: number) => void} [options.onProgress] - Called after every attempted
+     *        address with the total number of attempts so far (across all workers). Throwing
+     *        from it rejects the search with that error.
      * @param {number|'auto'} [options.workers=this.workers] - Number of worker threads to
      *        search in parallel, overriding the constructor's `workers` option for this call
      *        only. `'auto'` uses every available CPU core. `1` searches on the main thread.
@@ -433,18 +436,21 @@ class TonWalletFinder {
      */
     async findWalletWithEnding(options = {}) {
         // Safe destructure — works correctly for both undefined and null
-        const { signal, workers = this.workers } = options !== null ? options : {};
+        const { signal, workers = this.workers, onProgress } = options !== null ? options : {};
 
         const workerCount = resolveWorkerCount(workers);
+        if (onProgress !== undefined && typeof onProgress !== 'function') {
+            throw new TypeError(`Invalid onProgress option: expected a function, got ${typeof onProgress}.`);
+        }
 
         if (signal?.aborted) { throw abortErrorFrom(signal); }
 
         if (workerCount > 1) {
-            const { keyPair, words, walletAddress } = await this._searchWithWorkers(workerCount, signal);
+            const { keyPair, words, walletAddress } = await this._searchWithWorkers(workerCount, signal, onProgress);
             return this._finish(keyPair, words, walletAddress);
         }
 
-        const { keyPair, words, walletAddress } = await this._searchOnMainThread(signal);
+        const { keyPair, words, walletAddress } = await this._searchOnMainThread(signal, onProgress);
         return this._finish(keyPair, words, walletAddress);
     }
 
@@ -456,10 +462,11 @@ class TonWalletFinder {
      * thread only, and the event loop stays responsive.
      * @private
      */
-    _searchOnMainThread(signal) {
+    _searchOnMainThread(signal, onProgress) {
         return new Promise((resolve, reject) => {
             let settled = false;
             let consecutiveErrors = 0;
+            let attempts = 0;
 
             const onAbort = () => settle(reject, abortErrorFrom(signal));
             const settle = (fn, value) => {
@@ -497,6 +504,8 @@ class TonWalletFinder {
                     if (this.showProcess) {
                         console.log('Trying address:', walletAddress);
                     }
+                    attempts++;
+                    if (!reportProgress(onProgress, attempts, err => settle(reject, err))) { return; }
                     if (walletAddress.endsWith(this.targetEnding)) {
                         settle(resolve, { keyPair, words, walletAddress });
                         return;
@@ -518,10 +527,11 @@ class TonWalletFinder {
      * All workers are terminated as soon as one finds a match, on abort, or on error.
      * @private
      */
-    _searchWithWorkers(count, signal) {
+    _searchWithWorkers(count, signal, onProgress) {
         return new Promise((resolve, reject) => {
             const workers = [];
             let settled = false;
+            let attempts = 0;
 
             const shutdown = () => {
                 for (const w of workers) { w.terminate().catch(() => {}); }
@@ -539,16 +549,19 @@ class TonWalletFinder {
 
             for (let i = 0; i < count; i++) {
                 const w = this._createWorker({
-                    targetEnding:  this.targetEnding,
-                    showProcess:   this.showProcess,
-                    walletVersion: this.walletVersion,
+                    targetEnding:   this.targetEnding,
+                    showProcess:    this.showProcess,
+                    walletVersion:  this.walletVersion,
+                    reportProgress: typeof onProgress === 'function',
                 });
                 workers.push(w);
 
                 w.on('message', msg => {
                     if (settled) { return; }
                     if (msg.type === 'trying') {
-                        console.log('Trying address:', msg.address);
+                        if (this.showProcess) { console.log('Trying address:', msg.address); }
+                        attempts++;
+                        reportProgress(onProgress, attempts, err => settle(reject, err));
                     } else if (msg.type === 'found') {
                         settle(resolve, {
                             keyPair:       { publicKey: Buffer.from(msg.publicKey), secretKey: Buffer.from(msg.secretKey) },
@@ -614,6 +627,22 @@ function abortErrorFrom(signal) {
     const abortError = new Error(message, { cause: reason });
     abortError.name = 'AbortError';
     return abortError;
+}
+
+/**
+ * Call the user's onProgress callback, if any. A throwing callback ends the search
+ * (through `fail`) instead of escaping as an uncaught exception from a worker event.
+ * Returns false when the search was failed.
+ */
+function reportProgress(onProgress, attempts, fail) {
+    if (onProgress === undefined) { return true; }
+    try {
+        onProgress(attempts);
+        return true;
+    } catch (err) {
+        fail(err);
+        return false;
+    }
 }
 
 /**

@@ -8,8 +8,9 @@
 [![license](https://img.shields.io/npm/l/ton-wallet-finder?color=green&style=flat-square)](LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lendel/ton-wallet-finder/badge?style=flat-square)](https://scorecard.dev/viewer/?uri=github.com/lendel/ton-wallet-finder)
 
-**Vanity address generator for the TON blockchain.** Generates fresh wallets until one has an
-address ending with the string you choose — for example `EQ…cafe`.
+**Vanity address generator for the TON blockchain** — a command-line tool and a Node.js library.
+Generates fresh wallets until one has an address ending with the string you choose — for example
+`EQ…cafe`.
 
 **English** · [Русский](README.ru.md)
 
@@ -38,12 +39,41 @@ The software is provided "as is", without warranty of any kind (see [LICENSE](LI
 ## Install
 
 ```sh
-npm install ton-wallet-finder
+npm install ton-wallet-finder        # as a library
+npx ton-wallet-finder --help         # or run the command line tool without installing
 ```
 
 Requires **Node.js 22** or newer.
 
-## Quick start
+## Command line
+
+```sh
+npx ton-wallet-finder abc --wallet v5r1
+```
+
+The tool asks for a password **before** the search starts, shows live progress (attempts,
+speed, expected time) and saves the result to an encrypted `ton_wallet_results.enc.json`. The
+mnemonic is not printed unless you pass `--show`. Read the file back later with:
+
+```sh
+npx ton-wallet-finder --decrypt ton_wallet_results.enc.json
+```
+
+| Option | Description |
+|---|---|
+| `-w, --wallet <v3r2\|v4r2\|v5r1>` | Wallet contract (default `v4r2`); must match your wallet app — Tonkeeper and Telegram Wallet use `v5r1` |
+| `-j, --workers <n\|auto>` | Worker threads (default `auto`: one per CPU core) |
+| `-o, --output <file>` | File name in the current directory |
+| `--password-env <VAR>` | Take the password from an environment variable instead of asking (for scripts) |
+| `--plain` | Save as plain text instead of encrypting |
+| `--no-save --show` | Only print the result, write no file |
+| `--decrypt <file>` | Print the wallet stored in an encrypted file |
+| `-q, --quiet` | No progress line |
+
+Ctrl+C stops the search cleanly (exit code 130). Exit codes: `0` found, `1` error, `2` invalid
+usage. `npx ton-wallet-finder --help` lists everything.
+
+## Library quick start
 
 ```js
 import { TonWalletFinder } from 'ton-wallet-finder';
@@ -108,7 +138,8 @@ Generates wallets until one matches and resolves with:
 | `privateKey` | `string` | Ed25519 secret key (seed ‖ public key), hex |
 
 `options.signal` cancels the search; `options.workers` overrides the constructor's `workers`
-for this call:
+for this call; `options.onProgress(attempts)` is called after every attempted address with the
+running total across all workers (for progress bars):
 
 ```js
 const controller = new AbortController();

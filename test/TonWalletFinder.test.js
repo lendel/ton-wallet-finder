@@ -440,6 +440,47 @@ describe('TonWalletFinder', () => {
             }
         });
 
+        it('should report the running attempt count through onProgress', async () => {
+            const finder = new TonWalletFinder('A');
+            finder._mainThreadConcurrency = 1;
+            let n = 0;
+            sinon.stub(finder, 'createKeyPair').resolves({ keyPair: fakeKeyPair, words });
+            sinon.stub(finder, 'createWallet').callsFake(() => {
+                n++;
+                const addr = 'EQ' + (n === 3 ? 'A' : 'B').repeat(46);
+                return { toString: () => addr };
+            });
+            const counts = [];
+            try {
+                await finder.findWalletWithEnding({ onProgress: c => counts.push(c) });
+                expect(counts).to.deep.equal([1, 2, 3]);
+            } finally {
+                sinon.restore();
+            }
+        });
+
+        it('should reject with the error thrown by onProgress', async () => {
+            const finder = new TonWalletFinder('A');
+            sinon.stub(finder, 'createKeyPair').resolves({ keyPair: fakeKeyPair, words });
+            sinon.stub(finder, 'createWallet').returns({ toString: () => 'EQ' + 'B'.repeat(46) });
+            const boom = new Error('bad callback');
+            let err;
+            try {
+                await finder.findWalletWithEnding({ onProgress: () => { throw boom; } });
+            } catch (e) {
+                err = e;
+            } finally {
+                sinon.restore();
+            }
+            expect(err).to.equal(boom);
+        });
+
+        it('should reject a non-function onProgress with a TypeError', async () => {
+            let err;
+            try { await new TonWalletFinder('A').findWalletWithEnding({ onProgress: 'nope' }); } catch (e) { err = e; }
+            expect(err).to.be.instanceOf(TypeError);
+        });
+
         it('should reject on abort without waiting for in-flight attempts', async () => {
             const finder = new TonWalletFinder('A');
             finder._mainThreadConcurrency = 2;

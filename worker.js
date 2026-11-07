@@ -4,7 +4,7 @@
 //
 // Each worker runs an independent generate-and-check loop and reports back to
 // the main thread through parentPort:
-//   { type: 'trying', address }                       (only when showProcess)
+//   { type: 'trying', address }                       (only when showProcess or reportProgress)
 //   { type: 'found', publicKey, secretKey, words, address }
 //   { type: 'error', message }                       (after repeated failures)
 // The main thread terminates all workers as soon as one of them reports 'found'.
@@ -19,7 +19,7 @@ const { mnemonicNewSync, mnemonicToPrivateKeySync, walletAddress } = _internals;
 // Same policy as the single-threaded loop in index.js.
 const MAX_CONSECUTIVE_ERRORS = 5;
 
-async function searchLoop({ targetEnding, showProcess, walletVersion }) {
+async function searchLoop({ targetEnding, showProcess, walletVersion, reportProgress }) {
     let consecutiveErrors = 0;
     while (true) {
         let keyPair;
@@ -42,7 +42,7 @@ async function searchLoop({ targetEnding, showProcess, walletVersion }) {
             continue;
         }
 
-        if (showProcess) {
+        if (showProcess || reportProgress) {
             parentPort.postMessage({ type: 'trying', address });
         }
 

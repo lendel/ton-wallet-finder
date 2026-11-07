@@ -20,7 +20,11 @@ new TonWalletFinder('abc', { saveResult: true, workers: 4 });
 
 async function check(): Promise<void> {
     const controller = new AbortController();
-    const result: WalletResult = await finder.findWalletWithEnding({ signal: controller.signal, workers: 2 });
+    const result: WalletResult = await finder.findWalletWithEnding({
+        signal: controller.signal,
+        workers: 2,
+        onProgress: (attempts: number) => { void attempts; },
+    });
     const words: readonly string[] = result.words;
     void words;
 
@@ -45,3 +49,5 @@ new TonWalletFinder('abc', { walletVersion: 'v2' });
 new TonWalletFinder('abc', { saveResult: 'yes' });
 // @ts-expect-error — result fields are readonly
 finder.findWalletWithEnding().then(r => { r.walletAddress = ''; });
+// @ts-expect-error — onProgress must be a function
+finder.findWalletWithEnding({ onProgress: 'nope' });

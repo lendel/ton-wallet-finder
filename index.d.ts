@@ -91,6 +91,13 @@ export interface FindOptions {
      * Throughput scales almost linearly with the number of cores.
      */
     readonly workers?: number | 'auto';
+
+    /**
+     * Called after every attempted address with the total number of attempts so far, across
+     * all worker threads. Useful for progress bars and rate estimates. If it throws, the search
+     * rejects with that error.
+     */
+    readonly onProgress?: (attempts: number) => void;
 }
 
 /**
