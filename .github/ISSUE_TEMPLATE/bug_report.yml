@@ -1,0 +1,38 @@
+name: Bug report
+description: Something does not work as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste a private key, mnemonic (seed words) or an encrypted results file
+        password into an issue.** For security problems use
+        [private vulnerability reporting](https://github.com/lendel/ton-wallet-finder/security/advisories/new) instead.
+  - type: input
+    id: version
+    attributes:
+      label: ton-wallet-finder version
+      placeholder: "6.0.0"
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version and OS
+      placeholder: "Node.js 24.11.0, Ubuntu 24.04"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Code that shows the problem (without real keys).
+      render: js
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. actual behaviour
+    validations:
+      required: true

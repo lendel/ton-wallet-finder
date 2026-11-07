@@ -30,8 +30,11 @@ Find a wallet whose address ends with any string you choose.
 - [Options](#options)
 - [API](#api)
 - [Performance](#performance)
+- [Encrypted results](#encrypted-results)
+- [What's new in v6](#-whats-new-in-v6)
 - [What's new in v5](#-whats-new-in-v5)
 - [What's new in v4](#-whats-new-in-v4)
+- [Migration from v5](#-migration-from-v5)
 - [Migration from v4](#-migration-from-v4)
 - [Migration from v2/v3](#-migration-from-v2v3)
 - [Support the Author](#-support-the-author)
@@ -45,7 +48,7 @@ Find a wallet whose address ends with any string you choose.
 npm install ton-wallet-finder
 ```
 
-> Requires Node.js 20 or higher. **Node.js 22 or 24 (LTS) is recommended**: Node.js 20 reached end-of-life on 30 April 2026 and support for it will be dropped in the next major release.
+> Requires Node.js 22 or higher (Node.js 24 LTS recommended).
 
 ---
 
@@ -87,7 +90,7 @@ node findWallet.js
 new TonWalletFinder(targetEnding, {
   showProcess,   // boolean
   showResult,    // boolean
-  saveResult,    // boolean
+  saveResult,    // boolean | { password, fileName }
   workers,       // number | 'auto'
   walletVersion, // 'v3r2' | 'v4r2' | 'v5r1'
 });
@@ -98,7 +101,7 @@ new TonWalletFinder(targetEnding, {
 | `targetEnding` | `string` | required | Desired address ending. Latin letters, digits, `-`, `_`, at most 46 characters. **Case-sensitive.** |
 | `options.showProcess` | `boolean` | `false` | Log each attempted address to console |
 | `options.showResult` | `boolean` | `false` | Log found wallet details to console. **Keep `false` in shared/logged environments to avoid exposing private keys.** |
-| `options.saveResult` | `boolean` | `false` | Save result to `ton_wallet_results.txt` in the current working directory. Never overwrites: an existing file gets a `-2`, `-3`, … suffix |
+| `options.saveResult` | `boolean \| { password?, fileName? }` | `false` | Save the result in the current working directory. `true` writes plain text to `ton_wallet_results.txt`; `{ password }` writes an **encrypted** `ton_wallet_results.enc.json` — see [Encrypted results](#encrypted-results). Never overwrites: an existing file gets a `-2`, `-3`, … suffix |
 | `options.workers` | `number \| 'auto'` | `1` | Default worker-thread count for `findWalletWithEnding()` (see [Performance](#performance)). Overridable per call. |
 | `options.walletVersion` | `'v3r2' \| 'v4r2' \| 'v5r1'` | `'v4r2'` | TON wallet contract version to derive the address for — see [Wallet versions](#wallet-versions). |
 
@@ -167,14 +170,45 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 single-threaded). Passing `workers` to `findWalletWithEnding()` overrides that default for this
 call only. It can be combined with `signal`.
 
-### `saveResultsToFile(publicKey, privateKey, words, walletAddress, [fileName]) → Promise<string | undefined>`
+### `saveResultsToFile(publicKey, privateKey, words, walletAddress, [options]) → Promise<string | undefined>`
 
-Writes the credentials as plain text to `fileName` (default `ton_wallet_results.txt`) in the
-**current working directory**, with file mode `0600`. Never overwrites: if the file exists, a
-numeric suffix is appended (`ton_wallet_results-2.txt`, `-3`, …). Resolves with the absolute
-path of the written file, or `undefined` if writing failed (the error is logged, never thrown).
-`fileName` must be a plain file name — path separators are rejected. This is what
-`saveResult: true` calls internally.
+Writes the credentials to a file in the **current working directory**, with file mode `0600`.
+`options` is either a plain file name (as in v5) or `{ fileName?, password? }`:
+
+- without `password` — plain text, default name `ton_wallet_results.txt`;
+- with `password` — encrypted, default name `ton_wallet_results.enc.json`
+  (see [Encrypted results](#encrypted-results)).
+
+Never overwrites: if the file exists, a numeric suffix is appended
+(`ton_wallet_results-2.txt`, `-3`, …). Resolves with the absolute path of the written file, or
+`undefined` if writing failed (the error is logged, never thrown). `fileName` must be a plain
+file name — path separators are rejected. This is what `saveResult` calls internally.
+
+### `decryptResults(data, password) → Promise<Result>`
+
+Reads back an encrypted results file. `data` is the file content (`string` or `Buffer`).
+Rejects on a wrong password, a modified file or an unknown format.
+
+### Encrypted results
+
+```javascript
+const fs = require('fs');
+const { TonWalletFinder, decryptResults } = require('ton-wallet-finder');
+
+const password = process.env.WALLET_FILE_PASSWORD; // never hard-code it
+const finder = new TonWalletFinder('abc', { saveResult: { password } });
+await finder.findWalletWithEnding();              // → ton_wallet_results.enc.json
+
+// later
+const wallet = await decryptResults(fs.readFileSync('ton_wallet_results.enc.json'), password);
+console.log(wallet.walletAddress, wallet.words.length);
+```
+
+The key is derived with **scrypt** (N = 2¹⁷, r = 8, p = 1, random 16-byte salt) and the data
+is encrypted with **AES-256-GCM** (random 12-byte IV; the format header is authenticated too),
+using only Node.js built-in `crypto`. The file is JSON; nothing secret — not even the wallet
+address — is stored in the clear. Encryption is only as strong as the password: use a long,
+random one, and still move the wallet into a proper wallet app and delete the file afterwards.
 
 ### Lower-level methods
 
@@ -183,8 +217,8 @@ path of the written file, or `undefined` if writing failed (the error is logged,
 - `finder.createWallet(keyPair)` → object whose `toString()` returns the bounceable, URL-safe
   address for the configured `walletVersion` (synchronous).
 - `_internals` — the primitives behind the above (`mnemonicNew`, `mnemonicToPrivateKey`,
-  `isBasicSeed`, `walletAddress`, `walletV3R2Address`, `walletV4Address`, `walletV5R1Address`,
-  `cellHash`, `padBits`, `crc16`). Exported for testing and advanced use; not yet covered by
+  `isBasicSeed` and their `…Sync` variants, `walletAddress`, `walletV3R2Address`,
+  `walletV4Address`, `walletV5R1Address`, `cellHash`, `padBits`, `crc16`, `encryptResults`). Exported for testing and advanced use; not yet covered by
   semver guarantees.
 
 TypeScript declarations are included (`index.d.ts`).
@@ -196,20 +230,38 @@ TypeScript declarations are included (`index.d.ts`).
 Search time grows exponentially with ending length: on average **64ⁿ** candidates for an
 *n*-character ending. Each candidate is expensive by design — a TON mnemonic requires
 about 256 PBKDF2 seed-version checks plus one 100 000-iteration PBKDF2, roughly
-200 000 HMAC-SHA-512 rounds per address. Measured throughput is about **5 addresses per
-second per CPU core**.
+200 000 HMAC-SHA-512 rounds per address. Throughput is roughly **8–10 addresses per second
+per CPU core** on a current x86-64 CPU (measured: ~10/s per vCPU on a cloud VM).
 
-| Ending length | Attempts (avg) | 1 core | 8 cores (`workers: 'auto'`) |
-|--------------|----------------|--------|------------------------------|
-| 1 char | 64 | ~12 seconds | ~2 seconds |
-| 2 chars | 4 096 | ~13 minutes | ~2 minutes |
-| 3 chars | 262 144 | ~14 hours | ~2 hours |
-| 4 chars | 16 777 216 | ~5 weeks | ~5 days |
+- `workers: 1` (default) keeps JavaScript on the main thread, but since 6.0 runs several
+  attempts concurrently so PBKDF2 uses up to 4 cores through libuv's thread pool
+  (`UV_THREADPOOL_SIZE`, capped by the CPU count).
+- `workers: 'auto'` (or a number) spreads the search over worker threads and scales with the
+  number of cores.
 
-Estimate: `time ≈ 64ⁿ / (5 × cores)` seconds. Individual runs vary widely (the attempt
+| Ending length | Attempts (avg) | 1 core (~8/s) | 8 cores (~64/s) |
+|--------------|----------------|---------------|-----------------|
+| 1 char | 64 | ~8 seconds | ~1 second |
+| 2 chars | 4 096 | ~9 minutes | ~1 minute |
+| 3 chars | 262 144 | ~9 hours | ~1 hour |
+| 4 chars | 16 777 216 | ~3.5 weeks | ~3 days |
+
+Estimate: `time ≈ 64ⁿ / (8 × cores)` seconds. Individual runs vary widely (the attempt
 count is geometrically distributed), so treat these as medians, not guarantees.
 
 > The TON address alphabet is base64url (A–Z, a–z, 0–9, `-`, `_`), so each character position has **64** possible values.
+
+---
+
+## 🚀 What's new in v6
+
+- **Encrypted results** — `saveResult: { password }` writes an encrypted
+  `ton_wallet_results.enc.json` (scrypt + AES-256-GCM); `decryptResults()` reads it back.
+  See [Encrypted results](#encrypted-results).
+- **Faster search.** The single-threaded default (`workers: 1`) runs several attempts
+  concurrently and is up to ~4× faster; worker threads no longer share libuv's 4-thread pool,
+  so `workers: 'auto'` now scales past 4 cores.
+- **Node.js 22+** is required (Node.js 20 is end-of-life).
 
 ---
 
@@ -255,6 +307,16 @@ Starting with v4, everything is implemented using **Node.js built-in modules onl
 The public API is identical — no code changes required when upgrading from v3.
 
 ---
+
+## 🔀 Migration from v5
+
+| What changed | v5.x | v6.0.0 |
+|---|---|---|
+| Node.js | `>=20` | `>=22` |
+| CPU use with `workers: 1` | one PBKDF2 at a time | up to 4 concurrent PBKDF2 calls on libuv's pool (set `UV_THREADPOOL_SIZE=1` to restore the old behaviour) |
+| `saveResultsToFile()` 5th argument | `fileName` string | `fileName` string **or** `{ fileName, password }` (the string form still works) |
+
+No other API changes: addresses, defaults and result shapes are identical.
 
 ## 🔀 Migration from v4
 
@@ -371,7 +433,7 @@ Thank you for your support! 💙
 npm install ton-wallet-finder
 ```
 
-> Требуется Node.js 20 или выше. **Рекомендуется Node.js 22 или 24 (LTS)**: поддержка Node.js 20 закончилась 30 апреля 2026 года, и в следующей мажорной версии она будет убрана.
+> Требуется Node.js 22 или выше (рекомендуется Node.js 24 LTS).
 
 ### Быстрый старт
 
@@ -403,7 +465,7 @@ import { TonWalletFinder } from 'ton-wallet-finder';
 new TonWalletFinder(targetEnding, {
   showProcess,   // boolean
   showResult,    // boolean
-  saveResult,    // boolean
+  saveResult,    // boolean | { password, fileName }
   workers,       // number | 'auto'
   walletVersion, // 'v3r2' | 'v4r2' | 'v5r1'
 });
@@ -414,7 +476,7 @@ new TonWalletFinder(targetEnding, {
 | `targetEnding` | `string` | обязательный | Желаемое окончание адреса. Латиница, цифры, `-`, `_`, не более 46 символов. **Регистрозависимо.** |
 | `options.showProcess` | `boolean` | `false` | Выводить каждый проверяемый адрес в консоль |
 | `options.showResult` | `boolean` | `false` | Вывести найденный кошелёк в консоль. **Оставьте `false` в окружениях с логированием, чтобы не раскрывать приватный ключ.** |
-| `options.saveResult` | `boolean` | `false` | Сохранить результат в `ton_wallet_results.txt` в текущей рабочей директории. Существующий файл не перезаписывается: добавляется суффикс `-2`, `-3`, … |
+| `options.saveResult` | `boolean \| { password?, fileName? }` | `false` | Сохранить результат в текущей рабочей директории. `true` — открытым текстом в `ton_wallet_results.txt`; `{ password }` — **зашифрованный** `ton_wallet_results.enc.json`, см. [Зашифрованное сохранение](#зашифрованное-сохранение). Существующий файл не перезаписывается: добавляется суффикс `-2`, `-3`, … |
 | `options.workers` | `number \| 'auto'` | `1` | Значение по умолчанию для числа воркеров в `findWalletWithEnding()` (см. [Производительность](#производительность)). Можно переопределить при вызове. |
 | `options.walletVersion` | `'v3r2' \| 'v4r2' \| 'v5r1'` | `'v4r2'` | Версия контракта TON-кошелька для деривации адреса — см. [Версии кошелька](#версии-кошелька). |
 
@@ -482,14 +544,44 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 то есть один поток). `workers`, переданный в `findWalletWithEnding()`, переопределяет это
 значение только для данного вызова. Сочетается с `signal`.
 
-#### `saveResultsToFile(publicKey, privateKey, words, walletAddress, [fileName]) → Promise<string | undefined>`
+#### `saveResultsToFile(publicKey, privateKey, words, walletAddress, [options]) → Promise<string | undefined>`
 
-Записывает данные кошелька открытым текстом в `fileName` (по умолчанию `ton_wallet_results.txt`)
-в **текущей рабочей директории** с правами `0600`. Никогда не перезаписывает: если файл существует,
-добавляется числовой суффикс (`ton_wallet_results-2.txt`, `-3`, …). Возвращает абсолютный путь
-записанного файла или `undefined`, если запись не удалась (ошибка логируется, не выбрасывается).
-`fileName` должен быть простым именем файла — разделители пути отклоняются. Именно эту функцию
-вызывает `saveResult: true`.
+Записывает данные кошелька в файл в **текущей рабочей директории** с правами `0600`.
+`options` — либо простое имя файла (как в v5), либо `{ fileName?, password? }`:
+
+- без `password` — открытым текстом, по умолчанию `ton_wallet_results.txt`;
+- с `password` — в зашифрованном виде, по умолчанию `ton_wallet_results.enc.json`
+  (см. [Зашифрованное сохранение](#зашифрованное-сохранение)).
+
+Никогда не перезаписывает: если файл существует, добавляется числовой суффикс
+(`ton_wallet_results-2.txt`, `-3`, …). Возвращает абсолютный путь записанного файла или
+`undefined`, если запись не удалась (ошибка логируется, не выбрасывается). `fileName` должен
+быть простым именем файла — разделители пути отклоняются. Именно эту функцию вызывает `saveResult`.
+
+#### `decryptResults(data, password) → Promise<Result>`
+
+Читает зашифрованный файл результатов. `data` — содержимое файла (`string` или `Buffer`).
+Отклоняется при неверном пароле, изменённом файле или неизвестном формате.
+
+#### Зашифрованное сохранение
+
+```javascript
+const fs = require('fs');
+const { TonWalletFinder, decryptResults } = require('ton-wallet-finder');
+
+const password = process.env.WALLET_FILE_PASSWORD; // не храните пароль в коде
+const finder = new TonWalletFinder('abc', { saveResult: { password } });
+await finder.findWalletWithEnding();              // → ton_wallet_results.enc.json
+
+// позже
+const wallet = await decryptResults(fs.readFileSync('ton_wallet_results.enc.json'), password);
+```
+
+Ключ выводится через **scrypt** (N = 2¹⁷, r = 8, p = 1, случайная 16-байтная соль), данные
+шифруются **AES-256-GCM** (случайный 12-байтный IV, заголовок формата тоже аутентифицируется) —
+только встроенный `crypto` Node.js. Файл — JSON, ничего секретного (даже адрес кошелька) в нём
+открытым текстом не хранится. Защита не сильнее пароля: используйте длинный случайный пароль,
+а после переноса кошелька в приложение файл удалите.
 
 #### Низкоуровневые методы
 
@@ -498,8 +590,8 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 - `finder.createWallet(keyPair)` → объект, чей `toString()` возвращает bounceable URL-safe
   адрес для выбранной `walletVersion` (синхронно).
 - `_internals` — примитивы, на которых всё построено (`mnemonicNew`, `mnemonicToPrivateKey`,
-  `isBasicSeed`, `walletAddress`, `walletV3R2Address`, `walletV4Address`, `walletV5R1Address`,
-  `cellHash`, `padBits`, `crc16`). Экспортированы для тестов и продвинутого использования; пока
+  `isBasicSeed` и их `…Sync`-варианты, `walletAddress`, `walletV3R2Address`, `walletV4Address`,
+  `walletV5R1Address`, `cellHash`, `padBits`, `crc16`, `encryptResults`). Экспортированы для тестов и продвинутого использования; пока
   не покрыты гарантиями semver.
 
 Поставляется с декларациями TypeScript (`index.d.ts`).
@@ -509,18 +601,42 @@ const result = await finder.findWalletWithEnding({ workers: 4 });
 Время поиска растёт экспоненциально с длиной окончания: в среднем **64ⁿ** кандидатов для
 окончания из *n* символов. Каждый кандидат дорог по самой природе TON-мнемоники: около
 256 проверок seed-версии через PBKDF2 плюс один PBKDF2 на 100 000 итераций, то есть
-порядка 200 000 раундов HMAC-SHA-512 на один адрес. Измеренная скорость — около
-**5 адресов в секунду на одно ядро**.
+порядка 200 000 раундов HMAC-SHA-512 на один адрес. Скорость — примерно **8–10 адресов
+в секунду на одно ядро** современного x86-64 процессора (замер: ~10/с на vCPU облачной VM).
 
-| Длина окончания | Попыток (в среднем) | 1 ядро | 8 ядер (`workers: 'auto'`) |
-|----------------|---------------------|--------|-----------------------------|
-| 1 символ | 64 | ~12 секунд | ~2 секунды |
-| 2 символа | 4 096 | ~13 минут | ~2 минуты |
-| 3 символа | 262 144 | ~14 часов | ~2 часа |
-| 4 символа | 16 777 216 | ~5 недель | ~5 дней |
+- `workers: 1` (по умолчанию) — JavaScript работает в основном потоке, но с 6.0 несколько
+  попыток идут одновременно, и PBKDF2 занимает до 4 ядер через пул потоков libuv
+  (`UV_THREADPOOL_SIZE`, не больше числа ядер).
+- `workers: 'auto'` (или число) — поиск в worker-потоках, масштабируется по числу ядер.
 
-Оценка: `время ≈ 64ⁿ / (5 × ядра)` секунд. Разброс между запусками большой (число попыток
+| Длина окончания | Попыток (в среднем) | 1 ядро (~8/с) | 8 ядер (~64/с) |
+|----------------|---------------------|---------------|----------------|
+| 1 символ | 64 | ~8 секунд | ~1 секунда |
+| 2 символа | 4 096 | ~9 минут | ~1 минута |
+| 3 символа | 262 144 | ~9 часов | ~1 час |
+| 4 символа | 16 777 216 | ~3,5 недели | ~3 дня |
+
+Оценка: `время ≈ 64ⁿ / (8 × ядра)` секунд. Разброс между запусками большой (число попыток
 распределено геометрически), поэтому это медианы, а не гарантии.
+
+### Что нового в v6
+
+- **Зашифрованное сохранение** — `saveResult: { password }` пишет зашифрованный
+  `ton_wallet_results.enc.json` (scrypt + AES-256-GCM); `decryptResults()` читает его обратно.
+- **Быстрее поиск.** Однопоточный режим по умолчанию (`workers: 1`) выполняет несколько попыток
+  одновременно и быстрее до ~4 раз; worker-потоки больше не делят общий пул libuv из 4 потоков,
+  поэтому `workers: 'auto'` масштабируется дальше 4 ядер.
+- **Требуется Node.js 22+** (поддержка Node.js 20 закончилась).
+
+#### Миграция с v5
+
+| Что изменилось | v5.x | v6.0.0 |
+|---|---|---|
+| Node.js | `>=20` | `>=22` |
+| Нагрузка на CPU при `workers: 1` | один PBKDF2 за раз | до 4 одновременных PBKDF2 в пуле libuv (`UV_THREADPOOL_SIZE=1` вернёт старое поведение) |
+| 5-й аргумент `saveResultsToFile()` | строка `fileName` | строка `fileName` **или** `{ fileName, password }` (строка по-прежнему работает) |
+
+Других изменений API нет: адреса, значения по умолчанию и формат результата те же.
 
 ### Что нового в v5
 

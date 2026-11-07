@@ -57,12 +57,13 @@ same addresses as the single-threaded path.
 
 ---
 
-## Not done from the v5 plan
+## ✅ Shipped in 6.0.0
 
-- **Drop Node.js 20 from `engines` (`>=22`).** It was EOL on 2026-04-30 and CI covers
-  22/24/26, but it was left out of 5.0.0 rather than bundled in without its own
-  justification. Still a candidate for whenever `engines` next moves — which now needs
-  its own major, since 5.x already shipped with `>=20`.
+- **Node.js 22+** (`engines: ">=22"`). Node.js 20 was EOL on 2026-04-30.
+- **Encrypted output** for `saveResult` / `saveResultsToFile` (scrypt + AES-256-GCM,
+  no new dependency) and `decryptResults()` to read it back.
+- **Throughput:** worker threads use synchronous PBKDF2 (no longer capped by libuv's
+  4-thread pool); the single-threaded path keeps several attempts in flight.
 
 ---
 
@@ -77,9 +78,8 @@ Not planned.
 
 ### Smaller open items
 
-- Optional encrypted output for `saveResultsToFile` (password-based, `crypto.scrypt`
-  + AES-GCM, no new dependency) — came up in the original review as a nice-to-have,
-  not urgent. Candidate for a 5.2.0.
+- A small CLI (`npx ton-wallet-finder abc --workers auto --encrypt`) that prompts for the
+  file password instead of taking it as an argument.
 - Non-default `walletVersion` parameters are currently fixed: workchain 0 is the only
   value reachable through `TonWalletFinder` (the `_internals` primitives take a
   `workchain` argument), and `v5r1` is pinned to the mainnet wallet id with subwallet

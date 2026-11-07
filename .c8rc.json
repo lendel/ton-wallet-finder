@@ -1,0 +1,10 @@
+{
+  "all": true,
+  "include": ["index.js", "worker.js"],
+  "reporter": ["text", "lcov"],
+  "check-coverage": true,
+  "lines": 90,
+  "functions": 90,
+  "branches": 85,
+  "statements": 90
+}

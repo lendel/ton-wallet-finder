@@ -12,7 +12,9 @@
 const { parentPort, workerData, isMainThread } = require('worker_threads');
 const { _internals } = require('./index');
 
-const { mnemonicNew, mnemonicToPrivateKey, walletAddress } = _internals;
+// Sync variants on purpose: this loop already owns its thread, and the async
+// ones would funnel every worker's PBKDF2 through libuv's shared 4-thread pool.
+const { mnemonicNewSync, mnemonicToPrivateKeySync, walletAddress } = _internals;
 
 // Same policy as the single-threaded loop in index.js.
 const MAX_CONSECUTIVE_ERRORS = 5;
@@ -24,8 +26,8 @@ async function searchLoop({ targetEnding, showProcess, walletVersion }) {
         let words;
         let address;
         try {
-            words   = await mnemonicNew();
-            keyPair = await mnemonicToPrivateKey(words);
+            words   = mnemonicNewSync();
+            keyPair = mnemonicToPrivateKeySync(words);
             address = walletAddress(walletVersion, keyPair.publicKey);
             consecutiveErrors = 0;
         } catch (err) {

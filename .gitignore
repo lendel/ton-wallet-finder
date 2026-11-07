@@ -16,5 +16,16 @@ dist/
 
 .npmrc
 
-# Internal analysis files
-ANALYSIS.md
+# Test coverage
+coverage/
+.nyc_output/
+
+# Wallet results — contain private keys, never commit
+ton_wallet_results*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Packed tarballs
+*.tgz

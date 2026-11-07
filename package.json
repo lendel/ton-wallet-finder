@@ -1,35 +1,7 @@
 {
   "name": "ton-wallet-finder",
-  "version": "5.1.1",
+  "version": "6.0.0",
   "description": "Vanity address generator for TON blockchain — find a wallet address (v3r2 / v4r2 / v5r1) ending with any custom string.",
-  "main": "index.js",
-  "exports": {
-    ".": {
-      "types": "./index.d.ts",
-      "import": "./index.js",
-      "require": "./index.js",
-      "default": "./index.js"
-    },
-    "./package.json": "./package.json"
-  },
-  "types": "index.d.ts",
-  "files": [
-    "index.js",
-    "wordlist.js",
-    "index.d.ts",
-    "CHANGELOG.md",
-    "Readme.md",
-    "worker.js"
-  ],
-  "sideEffects": false,
-  "scripts": {
-    "lint": "eslint index.js worker.js test/",
-    "test": "mocha --recursive"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/lendel/ton-wallet-finder.git"
-  },
   "keywords": [
     "ton",
     "wallet",
@@ -45,9 +17,13 @@
     "toncoin",
     "cryptography"
   ],
-  "author": {
-    "name": "Lendel",
-    "url": "https://github.com/lendel"
+  "homepage": "https://github.com/lendel/ton-wallet-finder#readme",
+  "bugs": {
+    "url": "https://github.com/lendel/ton-wallet-finder/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lendel/ton-wallet-finder.git"
   },
   "funding": [
     {
@@ -60,21 +36,63 @@
     },
     {
       "type": "ko_fi",
-      "url": "https://ko-fi.com/lendelkz"
+      "url": "https://ko-fi.com/voanerges"
+    },
+    {
+      "type": "buymeacoffee",
+      "url": "https://www.buymeacoffee.com/voanerges"
     }
   ],
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/lendel/ton-wallet-finder/issues"
+  "author": {
+    "name": "Lendel",
+    "url": "https://github.com/lendel"
   },
-  "homepage": "https://github.com/lendel/ton-wallet-finder#readme",
-  "devDependencies": {
-    "chai": "4.3.7",
-    "eslint": "10.1.0",
-    "mocha": "12.0.0",
-    "sinon": "21.0.3"
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.js",
+      "default": "./index.js"
+    },
+    "./package.json": "./package.json"
   },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "worker.js",
+    "wordlist.js",
+    "CHANGELOG.md",
+    "README.md"
+  ],
+  "sideEffects": false,
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "test": "mocha",
+    "coverage": "c8 mocha",
+    "typecheck": "tsc -p tsconfig.json",
+    "pack:check": "npm pack --dry-run",
+    "check": "npm run lint && npm run typecheck && npm run coverage"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "devDependencies": {
+    "c8": "12.0.0",
+    "chai": "6.3.0",
+    "eslint": "10.14.0",
+    "mocha": "12.0.3",
+    "sinon": "22.1.0",
+    "typescript": "7.0.2"
+  },
+  "overrides": {
+    "glob": "^14.0.4",
+    "minimatch": "^11.0.5"
   }
 }

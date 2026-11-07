@@ -53,15 +53,40 @@ function pbkdf2Sha512(password, salt, iterations, keylen) {
     );
 }
 
+function pbkdf2Sha512Sync(password, salt, iterations, keylen) {
+    return crypto.pbkdf2Sync(password, salt, iterations, keylen, 'sha512');
+}
+
+// TON mnemonic parameters (mirror tonlib / @ton/crypto).
+const SEED_VERSION_SALT       = 'TON seed version';
+const SEED_VERSION_ITERATIONS = Math.max(1, Math.floor(100000 / 256)); // 390
+const DEFAULT_SEED_SALT       = 'TON default seed';
+const DEFAULT_SEED_ITERATIONS = 100000;
+const MNEMONIC_WORDS          = 24;
+
+/** Draw 24 uniformly random words from the 2048-word list (CSPRNG, unbiased by construction). */
+function randomWords() {
+    const words = new Array(MNEMONIC_WORDS);
+    for (let i = 0; i < MNEMONIC_WORDS; i++) {
+        words[i] = WORDLIST[crypto.randomInt(WORDLIST.length)];
+    }
+    return words;
+}
+
 /**
  * Check if the mnemonic array is a valid TON "basic seed" (no password).
  * Algorithm mirrors tonlib Mnemonic::is_basic_seed().
  */
 async function isBasicSeed(words) {
     const entropy = hmacSha512(words.join(' '), '');
-    const seed    = await pbkdf2Sha512(entropy, 'TON seed version',
-        Math.max(1, Math.floor(100000 / 256)), 64);
+    const seed    = await pbkdf2Sha512(entropy, SEED_VERSION_SALT, SEED_VERSION_ITERATIONS, 64);
     return seed[0] === 0;
+}
+
+/** Synchronous variant of isBasicSeed(). */
+function isBasicSeedSync(words) {
+    const entropy = hmacSha512(words.join(' '), '');
+    return pbkdf2Sha512Sync(entropy, SEED_VERSION_SALT, SEED_VERSION_ITERATIONS, 64)[0] === 0;
 }
 
 /**
@@ -69,16 +94,27 @@ async function isBasicSeed(words) {
  * Loops until the TON seed-version check passes (≈ 1 in 256 attempts).
  */
 async function mnemonicNew() {
-    const n = WORDLIST.length; // 2048
     while (true) {
-        // 2 bytes per word; 65536 / 2048 = 32 — no modulo bias.
-        const buf   = crypto.randomBytes(24 * 2);
-        const words = [];
-        for (let i = 0; i < 24; i++) {
-            words.push(WORDLIST[buf.readUInt16BE(i * 2) % n]);
-        }
+        const words = randomWords();
         if (await isBasicSeed(words)) { return words; }
     }
+}
+
+/**
+ * Synchronous variant of mnemonicNew(). Blocks the calling thread (~tens of ms),
+ * so it is meant for worker threads: the async variant runs PBKDF2 on libuv's
+ * process-wide thread pool (4 threads by default), which would cap the parallel
+ * search at 4 concurrent derivations no matter how many workers are started.
+ */
+function mnemonicNewSync() {
+    while (true) {
+        const words = randomWords();
+        if (isBasicSeedSync(words)) { return words; }
+    }
+}
+
+function normalizeWords(words) {
+    return words.map(w => w.toLowerCase().trim()).join(' ');
 }
 
 /**
@@ -86,9 +122,15 @@ async function mnemonicNew() {
  * Returns { publicKey: Buffer(32), secretKey: Buffer(64) }.
  */
 async function mnemonicToPrivateKey(words) {
-    const norm    = words.map(w => w.toLowerCase().trim());
-    const entropy = hmacSha512(norm.join(' '), '');
-    const seed64  = await pbkdf2Sha512(entropy, 'TON default seed', 100000, 64);
+    const entropy = hmacSha512(normalizeWords(words), '');
+    const seed64  = await pbkdf2Sha512(entropy, DEFAULT_SEED_SALT, DEFAULT_SEED_ITERATIONS, 64);
+    return ed25519FromSeed(seed64.subarray(0, 32));
+}
+
+/** Synchronous variant of mnemonicToPrivateKey() — see mnemonicNewSync(). */
+function mnemonicToPrivateKeySync(words) {
+    const entropy = hmacSha512(normalizeWords(words), '');
+    const seed64  = pbkdf2Sha512Sync(entropy, DEFAULT_SEED_SALT, DEFAULT_SEED_ITERATIONS, 64);
     return ed25519FromSeed(seed64.subarray(0, 32));
 }
 
@@ -313,7 +355,10 @@ class TonWalletFinder {
      * @param {object}  [options={}]                 - Optional configuration.
      * @param {boolean} [options.showProcess=false]  - Log each attempted address to console
      * @param {boolean} [options.showResult=false]   - Log found wallet details to console
-     * @param {boolean} [options.saveResult=false]   - Save result to ton_wallet_results.txt
+     * @param {boolean|{password?: string, fileName?: string}} [options.saveResult=false]
+     *        Save the result to a file in the current working directory. `true` writes
+     *        plain text (ton_wallet_results.txt); `{ password }` writes an encrypted file
+     *        (ton_wallet_results.enc.json) that `decryptResults()` can read back.
      * @param {number|'auto'} [options.workers=1]    - Default worker count for `findWalletWithEnding()`;
      *        overridable per call. See `findWalletWithEnding` for the accepted values.
      * @param {'v3r2'|'v4r2'|'v5r1'} [options.walletVersion='v4r2'] - TON wallet contract
@@ -346,6 +391,7 @@ class TonWalletFinder {
         // 'auto' is deliberately not resolved here — resolveWorkerCount() re-evaluates it
         // per search so a later change in available CPUs is picked up.
         resolveWorkerCount(workers);
+        validateSaveResult(saveResult);
 
         this.targetEnding  = targetEnding;
         this.showProcess   = showProcess;
@@ -353,6 +399,10 @@ class TonWalletFinder {
         this.saveResult    = saveResult;
         this.workers       = workers;
         this.walletVersion = walletVersion;
+
+        // Number of concurrent attempts in single-threaded mode (see _searchOnMainThread).
+        // Internal tuning knob, not part of the public API.
+        this._mainThreadConcurrency = defaultMainThreadConcurrency();
     }
 
     // Generate a new 24-word mnemonic and derive an Ed25519 key pair from it
@@ -394,41 +444,73 @@ class TonWalletFinder {
             return this._finish(keyPair, words, walletAddress);
         }
 
-        let keyPair;
-        let words;
-        // Declared once outside the loop; reused after the loop exits
-        let walletAddress;
-        let found = false;
-        let consecutiveErrors = 0;
-
-        // Search loop — generates wallets until the address suffix matches
-        do {
-            // Honour cancellation at the start of every iteration
-            if (signal?.aborted) { throw abortErrorFrom(signal); }
-
-            try {
-                ({ keyPair, words } = await this.createKeyPair());
-                walletAddress = this.createWallet(keyPair).toString({ urlSafe: true, bounceable: true });
-                consecutiveErrors = 0;
-            } catch (err) {
-                consecutiveErrors++;
-                if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-                    throw new Error(
-                        `Wallet generation failed ${consecutiveErrors} times in a row, giving up: ${err.message}`,
-                        { cause: err });
-                }
-                console.error('Error generating wallet, retrying:', err.message);
-                continue;
-            }
-
-            if (this.showProcess) {
-                console.log('Trying address:', walletAddress);
-            }
-
-            found = walletAddress.endsWith(this.targetEnding);
-        } while (!found);
-
+        const { keyPair, words, walletAddress } = await this._searchOnMainThread(signal);
         return this._finish(keyPair, words, walletAddress);
+    }
+
+    /**
+     * Single-threaded search. Runs `this._mainThreadConcurrency` generate-and-check
+     * loops concurrently on the event loop: each attempt is dominated by async PBKDF2,
+     * which runs on libuv's thread pool, so several loops in flight keep all of the
+     * pool busy instead of one thread at a time. JavaScript still runs on the main
+     * thread only, and the event loop stays responsive.
+     * @private
+     */
+    _searchOnMainThread(signal) {
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            let consecutiveErrors = 0;
+
+            const onAbort = () => settle(reject, abortErrorFrom(signal));
+            const settle = (fn, value) => {
+                if (settled) { return; }
+                settled = true;
+                if (signal) { signal.removeEventListener('abort', onAbort); }
+                fn(value);
+            };
+            if (signal) { signal.addEventListener('abort', onAbort, { once: true }); }
+
+            const loop = async () => {
+                while (!settled) {
+                    let keyPair;
+                    let words;
+                    let walletAddress;
+                    try {
+                        ({ keyPair, words } = await this.createKeyPair());
+                        walletAddress = this.createWallet(keyPair).toString({ urlSafe: true, bounceable: true });
+                    } catch (err) {
+                        if (settled) { return; }
+                        consecutiveErrors++;
+                        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                            settle(reject, new Error(
+                                `Wallet generation failed ${consecutiveErrors} times in a row, giving up: ${err.message}`,
+                                { cause: err }));
+                            return;
+                        }
+                        console.error('Error generating wallet, retrying:', err.message);
+                        continue;
+                    }
+                    // Another loop may have finished while this attempt was in flight.
+                    if (settled) { return; }
+                    consecutiveErrors = 0;
+
+                    if (this.showProcess) {
+                        console.log('Trying address:', walletAddress);
+                    }
+                    if (walletAddress.endsWith(this.targetEnding)) {
+                        settle(resolve, { keyPair, words, walletAddress });
+                        return;
+                    }
+                }
+            };
+
+            const concurrency = this._mainThreadConcurrency;
+            for (let i = 0; i < concurrency; i++) {
+                // loop() never rejects (every await is inside try/catch); the catch
+                // is a last-resort guard so a bug cannot become an unhandled rejection.
+                loop().catch(err => settle(reject, err));
+            }
+        });
     }
 
     /**
@@ -512,7 +594,8 @@ class TonWalletFinder {
         }
 
         if (this.saveResult) {
-            await saveResultsToFile(publicKey, privateKey, words, walletAddress);
+            const saveOptions = typeof this.saveResult === 'object' ? this.saveResult : {};
+            await saveResultsToFile(publicKey, privateKey, words, walletAddress, saveOptions);
         }
 
         return { publicKey, privateKey, words, walletAddress };
@@ -534,11 +617,21 @@ function abortErrorFrom(signal) {
 }
 
 /**
+ * libuv's thread pool size (UV_THREADPOOL_SIZE, default 4), capped by the CPU count:
+ * more concurrent PBKDF2 calls than either would only queue up.
+ */
+function defaultMainThreadConcurrency() {
+    const pool = Number.parseInt(process.env.UV_THREADPOOL_SIZE, 10);
+    const poolSize = Number.isInteger(pool) && pool > 0 ? pool : 4;
+    return Math.max(1, Math.min(poolSize, os.availableParallelism()));
+}
+
+/**
  * Validate the `workers` option: a positive integer, or 'auto' for one per CPU core.
  */
 function resolveWorkerCount(workers) {
     if (workers === 'auto') {
-        return typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length;
+        return os.availableParallelism();
     }
     if (!Number.isInteger(workers) || workers < 1) {
         throw new RangeError(`Invalid workers option: expected a positive integer or 'auto', got ${JSON.stringify(workers)}`);
@@ -549,41 +642,201 @@ function resolveWorkerCount(workers) {
 // Upper bound on "name-2.txt", "name-3.txt", … fallbacks before giving up.
 const MAX_FILENAME_ATTEMPTS = 1000;
 
+const PLAIN_RESULTS_FILE     = 'ton_wallet_results.txt';
+const ENCRYPTED_RESULTS_FILE = 'ton_wallet_results.enc.json';
+
+// ---------------------------------------------------------------------------
+// Encrypted results: scrypt (password → key) + AES-256-GCM, Node built-ins only
+// ---------------------------------------------------------------------------
+
+const ENCRYPTION_FORMAT  = 'ton-wallet-finder/encrypted-result';
+const ENCRYPTION_VERSION = 1;
+// scrypt cost N = 2^17, r = 8, p = 1 (≈128 MiB, a few hundred ms) — the OWASP
+// recommendation for interactive logins, comfortably above Node's defaults.
+const SCRYPT_PARAMS = { N: 2 ** 17, r: 8, p: 1 };
+// Upper bounds accepted when decrypting, so a crafted file cannot make
+// decryptResults() allocate gigabytes or spin for minutes.
+const SCRYPT_MAX_N = 2 ** 20;
+const SCRYPT_MAX_R = 32;
+const SCRYPT_MAX_P = 16;
+
+function scryptAsync(password, salt, keyLen, { N, r, p }) {
+    // scrypt needs 128 * N * r bytes; Node's default maxmem (32 MiB) is too small for N = 2^17.
+    const maxmem = 128 * N * r + 32 * 1024 * 1024;
+    return new Promise((resolve, reject) =>
+        crypto.scrypt(password, salt, keyLen, { N, r, p, maxmem },
+            (err, key) => err ? reject(err) : resolve(key)));
+}
+
+/** Additional authenticated data: binds the header fields to the ciphertext. */
+function encryptionAad({ N, r, p }) {
+    return Buffer.from(`${ENCRYPTION_FORMAT}|${ENCRYPTION_VERSION}|scrypt|${N}|${r}|${p}|aes-256-gcm`);
+}
+
+function assertPassword(password) {
+    if (typeof password !== 'string' || password.length === 0) {
+        throw new TypeError('password must be a non-empty string.');
+    }
+}
+
 /**
- * Write wallet credentials to a plain-text file in the current working directory.
+ * Encrypt a wallet result with a password. Returns the JSON text of the
+ * encrypted file. The plaintext is the JSON of { publicKey, privateKey, words, walletAddress }.
+ */
+async function encryptResults(result, password) {
+    assertPassword(password);
+    const salt = crypto.randomBytes(16);
+    const iv   = crypto.randomBytes(12);
+    const key  = await scryptAsync(password.normalize('NFKC'), salt, 32, SCRYPT_PARAMS);
+
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    cipher.setAAD(encryptionAad(SCRYPT_PARAMS));
+    const plaintext  = Buffer.from(JSON.stringify(result), 'utf8');
+    const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+    const tag        = cipher.getAuthTag();
+    plaintext.fill(0);
+    key.fill(0);
+
+    return JSON.stringify({
+        format:     ENCRYPTION_FORMAT,
+        version:    ENCRYPTION_VERSION,
+        kdf:        'scrypt',
+        kdfParams:  SCRYPT_PARAMS,
+        cipher:     'aes-256-gcm',
+        salt:       salt.toString('base64'),
+        iv:         iv.toString('base64'),
+        tag:        tag.toString('base64'),
+        ciphertext: ciphertext.toString('base64'),
+    }, null, 2) + '\n';
+}
+
+/**
+ * Decrypt a file written by `saveResultsToFile(..., { password })` (or by
+ * `saveResult: { password }`).
+ *
+ * @param {string|Buffer} data     - Contents of the encrypted file.
+ * @param {string}        password
+ * @returns {Promise<{ publicKey: string, privateKey: string, words: string[], walletAddress: string }>}
+ * @throws {Error} On a wrong password, a modified/corrupted file, or an unsupported format.
+ */
+async function decryptResults(data, password) {
+    assertPassword(password);
+    let doc;
+    try {
+        doc = JSON.parse(Buffer.isBuffer(data) ? data.toString('utf8') : String(data));
+    } catch (err) {
+        throw new Error('Not an encrypted ton-wallet-finder results file (invalid JSON).', { cause: err });
+    }
+    if (doc === null || typeof doc !== 'object' || doc.format !== ENCRYPTION_FORMAT) {
+        throw new Error('Not an encrypted ton-wallet-finder results file.');
+    }
+    if (doc.version !== ENCRYPTION_VERSION || doc.kdf !== 'scrypt' || doc.cipher !== 'aes-256-gcm') {
+        throw new Error(`Unsupported encrypted results format (version ${JSON.stringify(doc.version)}).`);
+    }
+    const { N, r, p } = doc.kdfParams ?? {};
+    const isPow2 = Number.isInteger(N) && N > 1 && (N & (N - 1)) === 0;
+    if (!isPow2 || N > SCRYPT_MAX_N || !Number.isInteger(r) || r < 1 || r > SCRYPT_MAX_R ||
+        !Number.isInteger(p) || p < 1 || p > SCRYPT_MAX_P) {
+        throw new Error('Encrypted results file has invalid or excessive scrypt parameters.');
+    }
+    const salt       = Buffer.from(String(doc.salt), 'base64');
+    const iv         = Buffer.from(String(doc.iv), 'base64');
+    const tag        = Buffer.from(String(doc.tag), 'base64');
+    const ciphertext = Buffer.from(String(doc.ciphertext), 'base64');
+    if (salt.length < 16 || iv.length !== 12 || tag.length !== 16) {
+        throw new Error('Encrypted results file is corrupted.');
+    }
+
+    const key = await scryptAsync(password.normalize('NFKC'), salt, 32, { N, r, p });
+    let plaintext;
+    try {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+        decipher.setAAD(encryptionAad({ N, r, p }));
+        decipher.setAuthTag(tag);
+        plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    } catch (err) {
+        throw new Error('Decryption failed: wrong password or the file was modified.', { cause: err });
+    } finally {
+        key.fill(0);
+    }
+    try {
+        return JSON.parse(plaintext.toString('utf8'));
+    } finally {
+        plaintext.fill(0);
+    }
+}
+
+/**
+ * Validate the constructor's `saveResult` option: a boolean, or { password?, fileName? }.
+ */
+function validateSaveResult(saveResult) {
+    if (typeof saveResult === 'boolean') { return; }
+    if (saveResult === null || typeof saveResult !== 'object' || Array.isArray(saveResult)) {
+        throw new TypeError(`Invalid saveResult option: expected a boolean or { password, fileName }, got ${JSON.stringify(saveResult)}.`);
+    }
+    const { password, fileName } = saveResult;
+    if (password !== undefined) { assertPassword(password); }
+    if (fileName !== undefined && !isPlainFileName(fileName)) {
+        throw new TypeError('Invalid saveResult.fileName: must be a plain filename without path separators.');
+    }
+}
+
+function isPlainFileName(fileName) {
+    return typeof fileName === 'string' && fileName.length > 0 && path.basename(fileName) === fileName;
+}
+
+/**
+ * Write wallet credentials to a file in the current working directory.
  *
  * Never overwrites: the file is created with the exclusive `wx` flag, and if a
  * file with that name already exists a numeric suffix is appended
  * (`ton_wallet_results-2.txt`, `-3`, …). The file is created with mode 0600.
  *
+ * With `options.password` the content is encrypted (scrypt + AES-256-GCM) and the
+ * default filename is `ton_wallet_results.enc.json`; read it back with `decryptResults()`.
+ *
  * @param {string}          publicKey
  * @param {string}          privateKey
  * @param {string[]|string} words
  * @param {string}          walletAddress
- * @param {string}          [fileName='ton_wallet_results.txt'] - plain filename, no path separators
+ * @param {string|{fileName?: string, password?: string}} [options]
+ *        A plain filename (no path separators), or an options object.
  * @returns {Promise<string|undefined>} absolute path of the written file, or undefined on error
  */
-async function saveResultsToFile(publicKey, privateKey, words, walletAddress, fileName = 'ton_wallet_results.txt') {
+async function saveResultsToFile(publicKey, privateKey, words, walletAddress, options = {}) {
     if (typeof publicKey !== 'string' || typeof privateKey !== 'string' || typeof walletAddress !== 'string') {
         console.error('Error: publicKey, privateKey, and walletAddress must be strings.');
         return undefined;
     }
 
+    const opts = typeof options === 'string' ? { fileName: options } : (options ?? {});
+    const { password } = opts;
+    const encrypt  = password !== undefined;
+    const fileName = opts.fileName ?? (encrypt ? ENCRYPTED_RESULTS_FILE : PLAIN_RESULTS_FILE);
+
     // Path traversal guard — fileName must be a plain filename, not a path.
-    if (typeof fileName !== 'string' || fileName.length === 0 || path.basename(fileName) !== fileName) {
+    if (!isPlainFileName(fileName)) {
         console.error('Error: fileName must be a plain filename without path separators.');
+        return undefined;
+    }
+    if (encrypt && (typeof password !== 'string' || password.length === 0)) {
+        console.error('Error: password must be a non-empty string.');
         return undefined;
     }
 
     // words may arrive as an array or as an already-joined string
-    const wordsString = Array.isArray(words) ? words.join(' ') : words;
-    const data = `Public Key: ${publicKey}\nPrivate Key: ${privateKey}\nWords: ${wordsString}\nWallet: ${walletAddress}\n`;
+    const wordsArray  = Array.isArray(words) ? words : String(words).split(/\s+/).filter(Boolean);
+    const wordsString = wordsArray.join(' ');
 
     const ext  = path.extname(fileName);
     const stem = fileName.slice(0, fileName.length - ext.length);
     const dir  = process.cwd();
 
     try {
+        const data = encrypt
+            ? await encryptResults({ publicKey, privateKey, words: wordsArray, walletAddress }, password)
+            : `Public Key: ${publicKey}\nPrivate Key: ${privateKey}\nWords: ${wordsString}\nWallet: ${walletAddress}\n`;
+
         for (let attempt = 1; attempt <= MAX_FILENAME_ATTEMPTS; attempt++) {
             const candidate = attempt === 1 ? fileName : `${stem}-${attempt}${ext}`;
             const resultsFile = path.join(dir, candidate);
@@ -608,14 +861,18 @@ async function saveResultsToFile(publicKey, privateKey, words, walletAddress, fi
 module.exports = {
     TonWalletFinder,
     saveResultsToFile,
+    decryptResults,
 };
 
 // Low-level primitives, exposed for testing and advanced use.
-// Not covered by semver guarantees yet; the public surface is the two exports above.
+// Not covered by semver guarantees yet; the public surface is the exports above.
 module.exports._internals = {
     mnemonicNew,
+    mnemonicNewSync,
     mnemonicToPrivateKey,
+    mnemonicToPrivateKeySync,
     isBasicSeed,
+    isBasicSeedSync,
     walletAddress,
     walletV3R2Address,
     walletV4Address,
@@ -623,4 +880,5 @@ module.exports._internals = {
     cellHash,
     padBits,
     crc16,
+    encryptResults,
 };
