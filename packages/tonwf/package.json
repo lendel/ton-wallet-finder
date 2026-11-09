@@ -1,0 +1,40 @@
+{
+  "name": "tonwf",
+  "version": "1.0.0",
+  "description": "Short name for the ton-wallet-finder CLI: `npx tonwf abc` finds a TON wallet whose address ends with abc.",
+  "keywords": [
+    "ton",
+    "vanity-address",
+    "wallet",
+    "cli",
+    "ton-wallet-finder"
+  ],
+  "homepage": "https://github.com/lendel/ton-wallet-finder#readme",
+  "bugs": {
+    "url": "https://github.com/lendel/ton-wallet-finder/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lendel/ton-wallet-finder.git",
+    "directory": "packages/tonwf"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Lendel",
+    "url": "https://github.com/lendel"
+  },
+  "bin": {
+    "tonwf": "cli.js"
+  },
+  "files": [
+    "cli.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "ton-wallet-finder": "^6.2.0"
+  }
+}

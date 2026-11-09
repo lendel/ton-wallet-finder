@@ -1,0 +1,50 @@
+name: Publish tonwf to npm
+
+# Publishes packages/tonwf (the `npx tonwf` short-name package) with npm Trusted
+# Publishing, like publish.yml does for the main package. Triggered by tags
+# `tonwf-vX.Y.Z`. The very first version was published by hand, because npm only
+# lets you register a trusted publisher for a package that already exists.
+on:
+  push:
+    tags:
+      - "tonwf-v*"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: publish-tonwf
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish tonwf
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write  # OIDC token for npm trusted publishing + provenance
+    defaults:
+      run:
+        working-directory: packages/tonwf
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.x
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Check that the tag matches packages/tonwf/package.json
+        if: github.ref_type == 'tag'
+        run: |
+          PKG="tonwf-v$(node -p "require('./package.json').version")"
+          if [ "$PKG" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match packages/tonwf version $PKG"
+            exit 1
+          fi
+
+      - name: Publish
+        run: npm publish --provenance --access public

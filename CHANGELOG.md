@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`npx tonwf`.** New npm package [`tonwf`](packages/tonwf), published from this repository:
+  a few-line wrapper that starts this package's CLI, so the short name works without a global
+  install. It has no logic of its own and depends on `ton-wallet-finder@^6.2.0`; versioned and
+  released separately (tags `tonwf-vX.Y.Z`, workflow `publish-tonwf.yml`).
+
 ---
 
 ## [6.2.0] — 2026-11-07

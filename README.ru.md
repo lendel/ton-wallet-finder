@@ -74,16 +74,17 @@ npx ton-wallet-finder --decrypt ton_wallet_results.enc.json
 Ctrl+C корректно останавливает поиск (код возврата 130). Коды возврата: `0` — найдено, `1` — ошибка,
 `2` — неверные аргументы. Полный список — `npx ton-wallet-finder --help`.
 
-**Короткое имя.** После глобальной установки доступна и короткая команда `tonwf`:
+**Короткое имя.** `tonwf` — та же программа под коротким именем:
 
 ```sh
-npm install -g ton-wallet-finder
-tonwf abc
-tonwf --decrypt ton_wallet_results.enc.json
+npx tonwf abc                        # без установки
+npm install -g ton-wallet-finder     # или установить один раз…
+tonwf abc                            # …и запускать напрямую
 ```
 
-Без глобальной установки используйте `npx -p ton-wallet-finder tonwf …`. Не запускайте
-`npx tonwf` или `npx twf`: npx скачает пакет с таким именем, а это не наш пакет.
+`npx tonwf` запускает пакет [`tonwf`](https://www.npmjs.com/package/tonwf) — крошечную обёртку,
+которая публикуется из этого репозитория ([`packages/tonwf`](packages/tonwf)) и запускает этот CLI.
+Не используйте `npx twf`: это посторонний пакет.
 
 ## Библиотека: быстрый старт
 

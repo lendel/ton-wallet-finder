@@ -145,6 +145,21 @@ Releases are published by CI only (`.github/workflows/publish.yml`), never from 
    changelog entry with release readers in mind. To create a missing release for an
    already published tag, run **GitHub Release** manually from the *Actions* tab with the tag.
 
+### The `tonwf` package
+
+`packages/tonwf` is a separate npm package (`npx tonwf`) that only starts this package's CLI.
+It is released on its own, rarely:
+
+- **When:** after a new *major* of `ton-wallet-finder` (bump its dependency range, e.g.
+  `^7.0.0`; `test/cli.test.js` fails until you do), or when its README/wrapper changes.
+  Minor and patch releases of the main package reach `npx tonwf` users automatically.
+- **How:** bump `packages/tonwf/package.json`, merge, then
+  `git tag tonwf-vX.Y.Z && git push origin tonwf-vX.Y.Z` — `publish-tonwf.yml` publishes it.
+- **First publish (done once, by hand):** npm only lets you register a trusted publisher for a
+  package that exists, so version 1.0.0 is published locally:
+  `cd packages/tonwf && npm publish --access public`. Then register the trusted publisher for
+  `tonwf` exactly as below, but with workflow `publish-tonwf.yml`.
+
 ### Authentication: npm trusted publishing (OIDC)
 
 The workflow carries **no npm token**. npm authenticates the GitHub Actions run through
