@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [6.2.0] — 2026-11-07
+
+### Added
+- **Short CLI name `tonwf`.** The package now installs two commands, `ton-wallet-finder` and
+  `tonwf` (same program). `tonwf` is available after `npm install -g ton-wallet-finder`, or
+  via `npx -p ton-wallet-finder tonwf`. `twf` was not used: an unrelated npm package with that
+  name already provides a `twf` command, so `npx twf` would run someone else's code.
+
 ## [6.1.0] — 2026-11-07
 
 ### Added
