@@ -141,6 +141,56 @@ describe('CLI', function () {
         });
     });
 
+    // packages/tonwf: the `npx tonwf` short-name package. It only forwards to this CLI, so the
+    // test installs it next to a link to this repository, the way npm would lay it out.
+    describe('tonwf wrapper package', () => {
+        let wrapper;
+        beforeEach(() => {
+            const modules = path.join(tmpDir, 'node_modules');
+            fs.mkdirSync(modules);
+            fs.symlinkSync(path.join(__dirname, '..'), path.join(modules, 'ton-wallet-finder'), 'junction');
+            wrapper = path.join(tmpDir, 'tonwf-cli.js');
+            fs.copyFileSync(path.join(__dirname, '..', 'packages', 'tonwf', 'cli.js'), wrapper);
+        });
+
+        function runWrapper(args) {
+            return new Promise((resolve, reject) => {
+                const child = spawn(process.execPath, [wrapper, ...args], { cwd: tmpDir, stdio: ['ignore', 'pipe', 'pipe'] });
+                let stdout = '';
+                let stderr = '';
+                child.stdout.on('data', d => { stdout += d; });
+                child.stderr.on('data', d => { stderr += d; });
+                child.on('error', reject);
+                child.on('close', code => resolve({ code, stdout, stderr }));
+            });
+        }
+
+        it('forwards arguments and output', async () => {
+            const { code, stdout } = await runWrapper(['--version']);
+            expect(code).to.equal(0);
+            expect(stdout.trim()).to.equal(version);
+        });
+
+        it('passes the exit code through', async () => {
+            const { code, stderr } = await runWrapper(['abc', '-w', 'v2']);
+            expect(code).to.equal(2);
+            expect(stderr).to.include('--wallet must be one of');
+        });
+
+        it('runs a real search', async () => {
+            const { code, stdout } = await runWrapper(['A', '--no-save', '--show', '-q', '-j', '1']);
+            expect(code).to.equal(0);
+            expect(stdout).to.include('Wallet version: v5r1');
+        });
+
+        it('depends on the current major of ton-wallet-finder', () => {
+            const wrapperPkg = require('../packages/tonwf/package.json');
+            const major = version.split('.')[0];
+            expect(wrapperPkg.dependencies['ton-wallet-finder']).to.match(new RegExp(`^\\^${major}\\.`));
+            expect(wrapperPkg.bin).to.deep.equal({ tonwf: 'cli.js' });
+        });
+    });
+
     describe('helpers', () => {
         it('parseCli applies the defaults', () => {
             const o = parseCli(['abc']);
