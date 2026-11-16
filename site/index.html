@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TON Wallet Finder — vanity addresses for TON</title>
+<meta name="description" content="Find a TON wallet address ending with any word you choose. Open-source CLI and Node.js library: zero dependencies, zero network calls, v3r2 / v4r2 / v5r1.">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230098EA'/%3E%3Cpath d='M9 11h14l-7 12z' fill='none' stroke='white' stroke-width='2.4' stroke-linejoin='round'/%3E%3Cpath d='M16 11v12' stroke='white' stroke-width='2.4'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #0b1220;
+  --bg-2: #0f1a2e;
+  --card: #13213a;
+  --line: #22365a;
+  --text: #e8eef8;
+  --muted: #93a4c0;
+  --accent: #0098ea;
+  --accent-2: #4dc3ff;
+  --hit: #3ee08f;
+  --warn: #ffb648;
+  --term: #070d18;
+  --shadow: 0 20px 60px rgba(0, 0, 0, .45);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f5f8fc; --bg-2: #eaf1f9; --card: #ffffff; --line: #d6e1ef;
+    --text: #0d1b2e; --muted: #50627d; --accent: #0088d1; --accent-2: #0098ea;
+    --hit: #0f9d58; --warn: #b26a00; --term: #0b1220;
+    --shadow: 0 20px 50px rgba(13, 27, 46, .12);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+code, kbd, .mono { font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
+a { color: var(--accent-2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+
+/* header */
+header {
+  position: sticky; top: 0; z-index: 10;
+  backdrop-filter: saturate(160%) blur(12px);
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+.nav { display: flex; align-items: center; gap: 24px; height: 64px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); }
+.brand:hover { text-decoration: none; }
+.logo { width: 30px; height: 30px; }
+.nav-links { display: flex; gap: 22px; margin-left: auto; font-size: 15px; }
+.nav-links a { color: var(--muted); }
+.nav-links a:hover { color: var(--text); text-decoration: none; }
+.lang {
+  display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px;
+}
+.lang button {
+  border: 0; background: none; color: var(--muted); font: 600 13px/1 inherit;
+  padding: 6px 10px; border-radius: 999px; cursor: pointer;
+}
+.lang button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.gh { display: inline-flex; color: var(--muted); }
+.gh:hover { color: var(--text); }
+
+/* hero */
+.hero { position: relative; overflow: hidden; padding: 84px 0 72px; }
+.hero::before {
+  content: ""; position: absolute; inset: -40% -10% auto; height: 120%;
+  background:
+    radial-gradient(600px 300px at 20% 30%, color-mix(in srgb, var(--accent) 35%, transparent), transparent 70%),
+    radial-gradient(500px 280px at 85% 10%, color-mix(in srgb, var(--accent-2) 22%, transparent), transparent 70%);
+  pointer-events: none;
+}
+.hero .wrap { position: relative; display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center; }
+.pill {
+  display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; background: var(--bg-2);
+}
+.pill b { color: var(--hit); font-weight: 600; }
+h1 { font-size: clamp(36px, 5.2vw, 58px); line-height: 1.05; letter-spacing: -.02em; margin: 18px 0 18px; }
+h1 .grad {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.lead { font-size: 19px; color: var(--muted); max-width: 34em; margin: 0 0 28px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 12px;
+  font-weight: 600; border: 1px solid var(--line); color: var(--text); background: var(--card);
+}
+.btn:hover { text-decoration: none; border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+
+.cmd {
+  display: inline-flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px;
+  background: var(--term); color: #dfe8f5; border: 1px solid var(--line); border-radius: 12px; font-size: 15px;
+}
+.cmd .p { color: var(--accent-2); user-select: none; }
+.copy {
+  border: 1px solid #2b3f63; background: #14233d; color: #b8c7de; border-radius: 8px;
+  font: 600 12px/1 inherit; padding: 7px 10px; cursor: pointer;
+}
+.copy:hover { color: #fff; border-color: var(--accent); }
+.copy.ok { color: var(--hit); border-color: var(--hit); }
+
+/* terminal */
+.term {
+  background: var(--term); border: 1px solid #1d2c48; border-radius: 16px; box-shadow: var(--shadow);
+  color: #cfd9ea; font-size: 13.5px; overflow: hidden;
+}
+.term-bar { display: flex; gap: 7px; padding: 12px 14px; border-bottom: 1px solid #16243c; }
+.term-bar i { width: 11px; height: 11px; border-radius: 50%; background: #2a3a57; }
+.term-bar i:nth-child(1) { background: #ff5f57; } .term-bar i:nth-child(2) { background: #febc2e; } .term-bar i:nth-child(3) { background: #28c840; }
+.term-body { padding: 16px 18px 20px; min-height: 300px; white-space: pre; overflow: hidden; line-height: 1.75; }
+.t-dim { color: #5f7193; } .t-acc { color: #4dc3ff; } .t-ok { color: #3ee08f; } .t-hit { color: #0b1220; background: #3ee08f; border-radius: 3px; padding: 0 1px; }
+.cursor { display: inline-block; width: 8px; height: 1.1em; vertical-align: -2px; background: #4dc3ff; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* sections */
+section { padding: 84px 0; }
+section.alt { background: var(--bg-2); border-block: 1px solid var(--line); }
+.eyebrow { color: var(--accent-2); font: 600 13px/1 inherit; letter-spacing: .12em; text-transform: uppercase; }
+h2 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.15; letter-spacing: -.015em; margin: 12px 0 14px; }
+.sub { color: var(--muted); max-width: 40em; margin: 0 0 40px; font-size: 17px; }
+
+.grid { display: grid; gap: 18px; }
+.g4 { grid-template-columns: repeat(4, 1fr); }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.grid > *, .est > *, .hero .wrap > * { min-width: 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+.card h3 { font-size: 18px; margin: 14px 0 8px; }
+.card p { color: var(--muted); margin: 0; font-size: 15px; }
+.ico {
+  width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-2);
+}
+.ico svg { width: 22px; height: 22px; }
+
+.step-n {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+  background: var(--accent); color: #fff;
+}
+.card pre { margin: 14px 0 0; padding: 12px 14px; background: var(--term); color: #dfe8f5; border-radius: 10px; font-size: 13.5px; overflow-x: auto; }
+
+/* estimator */
+.est { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: stretch; }
+.est .card label { display: block; font-weight: 600; margin-bottom: 8px; }
+.est input[type=text] {
+  width: 100%; font: 22px/1.2 ui-monospace, Menlo, Consolas, monospace; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text); outline: none;
+}
+.est input[type=text]:focus { border-color: var(--accent); }
+.est input[type=range] { width: 100%; accent-color: var(--accent); }
+.row { display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; margin-top: 6px; }
+.hint { color: var(--muted); font-size: 14px; margin-top: 10px; min-height: 1.4em; }
+.hint.bad { color: var(--warn); }
+.preview { font-size: 15px; word-break: break-all; margin: 0 0 18px; color: var(--muted); }
+.preview b { color: var(--hit); }
+.big { font-size: 44px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin-top: 18px; font-size: 15px; }
+.kv dt { color: var(--muted); } .kv dd { margin: 0; font-weight: 600; text-align: right; }
+.note { color: var(--muted); font-size: 13px; margin-top: 16px; }
+
+/* versions */
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+td code { color: var(--accent-2); }
+.tag { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, var(--hit) 18%, transparent); color: var(--hit); margin-left: 6px; }
+.table-card { padding: 0; overflow-x: auto; }
+
+/* safety */
+.safety { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 7%, var(--card)); }
+.safety h3 { color: var(--warn); margin-top: 0; }
+.safety ul { margin: 0; padding-left: 20px; color: var(--muted); }
+.safety li { margin: 6px 0; }
+
+/* footer */
+footer { padding: 48px 0 56px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+.foot { display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between; align-items: center; }
+.donate { display: flex; flex-wrap: wrap; gap: 10px; }
+.donate a { border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; color: var(--text); font-size: 14px; }
+.donate a:hover { border-color: var(--accent); text-decoration: none; }
+
+@media (max-width: 920px) {
+  .hero .wrap, .est { grid-template-columns: 1fr; }
+  .g4 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+  .lang { margin-left: auto; }
+}
+@media (max-width: 560px) {
+  .g4 { grid-template-columns: 1fr; }
+  .hero { padding-top: 56px; }
+  .term-body { font-size: 11.5px; padding: 14px; }
+  .cmd { font-size: 13.5px; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#top">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0098EA"/><path d="M9 11h14l-7 12z" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round"/><path d="M16 11v12" stroke="#fff" stroke-width="2.4"/></svg>
+      TON Wallet Finder
+    </a>
+    <nav class="nav-links">
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#how" data-i18n="nav.how">How it works</a>
+      <a href="#estimate" data-i18n="nav.estimate">Time estimate</a>
+      <a href="#safety" data-i18n="nav.safety">Safety</a>
+    </nav>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+      <button type="button" data-lang="ru" aria-pressed="false">RU</button>
+    </div>
+    <a class="gh" href="https://github.com/lendel/ton-wallet-finder" aria-label="GitHub">
+      <svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    </a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="pill"><b>●</b> <span data-i18n="hero.pill">Open source · MIT · v6.2</span></span>
+        <h1 data-i18n-html="hero.title">Your TON address,<br><span class="grad">ending your way</span></h1>
+        <p class="lead" data-i18n="hero.lead">Generate fresh TON wallets until one ends with the word you choose — like UQ…cafe. A command-line tool and a Node.js library that runs entirely on your machine.</p>
+        <div class="cta">
+          <div class="cmd mono"><span><span class="p">$</span> npx tonwf cafe</span><button class="copy" data-copy="npx tonwf cafe" data-i18n="copy">Copy</button></div>
+          <a class="btn" href="https://github.com/lendel/ton-wallet-finder#readme" data-i18n="hero.docs">Documentation →</a>
+        </div>
+      </div>
+      <div class="term" aria-hidden="true">
+        <div class="term-bar"><i></i><i></i><i></i></div>
+        <div class="term-body mono" id="term"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="eyebrow" data-i18n="feat.eyebrow">Why this tool</div>
+      <h2 data-i18n="feat.title">Built for keys you can trust</h2>
+      <p class="sub" data-i18n="feat.sub">It creates real private keys, so it is designed to be small, auditable and boring in the best way.</p>
+      <div class="grid g4">
+        <div class="card">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3 data-i18n="f1.t">Zero dependencies</h3>
+          <p data-i18n="f1.d">Only Node.js built-ins. No network calls — your keys never leave the computer.</p>
+        </div>
+        <div class="card">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
+          <h3 data-i18n="f2.t">Encrypted results</h3>
+          <p data-i18n="f2.d">Asks for a password before the search and saves the mnemonic to an encrypted file.</p>
+        </div>
+        <div class="card">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></div>
+          <h3 data-i18n="f3.t">Every CPU core</h3>
+          <p data-i18n="f3.d">Parallel search on worker threads with live progress, speed and expected time.</p>
+        </div>
+        <div class="card">
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <h3 data-i18n="f4.t">Verifiable releases</h3>
+          <p data-i18n="f4.d">Published from CI with npm provenance. Crypto pinned to @ton reference vectors.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" class="alt">
+    <div class="wrap">
+      <div class="eyebrow" data-i18n="how.eyebrow">How it works</div>
+      <h2 data-i18n="how.title">Three commands, one wallet</h2>
+      <p class="sub" data-i18n="how.sub">Requires Node.js 22 or newer. Nothing to install globally.</p>
+      <div class="grid g3">
+        <div class="card">
+          <div class="step-n">1</div>
+          <h3 data-i18n="s1.t">Pick an ending</h3>
+          <p data-i18n="s1.d">Latin letters, digits, “-” and “_”. Case-sensitive: abc ≠ ABC.</p>
+          <pre class="mono">npx tonwf cafe</pre>
+        </div>
+        <div class="card">
+          <div class="step-n">2</div>
+          <h3 data-i18n="s2.t">Let it search</h3>
+          <p data-i18n="s2.d">Set a password, watch the progress. Ctrl+C stops the search cleanly.</p>
+          <pre class="mono">-w v5r1  -j auto</pre>
+        </div>
+        <div class="card">
+          <div class="step-n">3</div>
+          <h3 data-i18n="s3.t">Import and verify</h3>
+          <p data-i18n="s3.d">Decrypt the file, import the 24 words into your wallet and check the address.</p>
+          <pre class="mono">npx tonwf --decrypt ton_wallet_results.enc.json</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="estimate">
+    <div class="wrap">
+      <div class="eyebrow" data-i18n="est.eyebrow">Time estimate</div>
+      <h2 data-i18n="est.title">How long will it take?</h2>
+      <p class="sub" data-i18n="est.sub">Each extra character multiplies the work by 64. Every attempt is a deliberately slow key derivation — about 8 addresses per second per core.</p>
+      <div class="est">
+        <div class="card">
+          <label for="end" data-i18n="est.label">Desired ending</label>
+          <input id="end" type="text" value="cafe" maxlength="12" spellcheck="false" autocomplete="off">
+          <div class="hint" id="hint"></div>
+          <label for="cores" style="margin-top:22px" data-i18n="est.cores">CPU cores</label>
+          <input id="cores" type="range" min="1" max="64" value="8">
+          <div class="row"><span>1</span><span><b id="coresVal">8</b></span><span>64</span></div>
+        </div>
+        <div class="card">
+          <p class="preview mono" id="preview"></p>
+          <div class="big" id="time">—</div>
+          <dl class="kv">
+            <dt data-i18n="est.attempts">Average attempts</dt><dd id="attempts">—</dd>
+            <dt data-i18n="est.speed">Speed</dt><dd id="speed">—</dd>
+          </dl>
+          <p class="note" data-i18n="est.note">An average, not a promise: runs vary widely in both directions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="alt">
+    <div class="wrap">
+      <div class="eyebrow" data-i18n="ver.eyebrow">Wallet versions</div>
+      <h2 data-i18n="ver.title">Match the wallet you use</h2>
+      <p class="sub" data-i18n="ver.sub">The same 24 words give a different address for every contract version. Search with the one your wallet app uses.</p>
+      <div class="card table-card">
+        <table>
+          <thead><tr><th data-i18n="ver.c1">Flag</th><th data-i18n="ver.c2">Contract</th><th data-i18n="ver.c3">Where</th></tr></thead>
+          <tbody>
+            <tr><td><code>-w v5r1</code></td><td>WalletV5R1 (W5) <span class="tag" data-i18n="ver.default">CLI default</span></td><td data-i18n="ver.r1">Tonkeeper, Telegram Wallet, MyTonWallet</td></tr>
+            <tr><td><code>-w v4r2</code></td><td>WalletV4R2</td><td data-i18n="ver.r2">Widely supported; library default</td></tr>
+            <tr><td><code>-w v3r2</code></td><td>WalletV3R2</td><td data-i18n="ver.r3">Legacy, still importable in most wallets</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="safety">
+    <div class="wrap">
+      <div class="card safety">
+        <h3 data-i18n="safe.t">⚠ Treat the output like cash</h3>
+        <ul>
+          <li data-i18n="safe.1">Run it on a machine you trust — not in CI or a shared environment.</li>
+          <li data-i18n="safe.2">Keep the encrypted file; avoid printing the mnemonic where output is logged.</li>
+          <li data-i18n="safe.3">Before sending funds, import the words and check that the wallet shows exactly the found address.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <div><a href="https://github.com/lendel/ton-wallet-finder">GitHub</a> · <a href="https://www.npmjs.com/package/ton-wallet-finder">npm</a> · <a href="https://github.com/lendel/ton-wallet-finder/blob/main/CHANGELOG.md">Changelog</a></div>
+      <div style="margin-top:6px">MIT © <a href="https://github.com/lendel">Lendel</a></div>
+    </div>
+    <div>
+      <div style="margin-bottom:8px" data-i18n="foot.thanks">Saved you time? A small thank-you goes a long way 💙</div>
+      <div class="donate">
+        <a href="https://app.tonkeeper.com/transfer/UQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJSau?text=Thank%20you%20for%20ton-wallet-finder!">TON · Tonkeeper</a>
+        <a href="https://ko-fi.com/voanerges">Ko-fi</a>
+        <a href="https://www.buymeacoffee.com/voanerges">Buy Me a Coffee</a>
+        <a href="https://www.paypal.me/lendelkz">PayPal</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- i18n: English is in the HTML; Russian lives here ----------
+  const RU = {
+    'meta.title': 'TON Wallet Finder — красивые адреса для TON',
+    'meta.desc': 'Найдите адрес TON-кошелька, который заканчивается на любое слово. CLI и Node.js-библиотека с открытым кодом: ноль зависимостей, ноль сетевых запросов, v3r2 / v4r2 / v5r1.',
+    'nav.features': 'Возможности', 'nav.how': 'Как работает', 'nav.estimate': 'Оценка времени', 'nav.safety': 'Безопасность',
+    'hero.pill': 'Открытый код · MIT · v6.2',
+    'hero.title': 'Ваш TON-адрес<br><span class="grad">с нужной концовкой</span>',
+    'hero.lead': 'Генерирует новые TON-кошельки, пока адрес не закончится на выбранное вами слово — например, UQ…cafe. Консольная утилита и Node.js-библиотека, которые работают только на вашем компьютере.',
+    'hero.docs': 'Документация →', 'copy': 'Копировать', 'copied': 'Готово',
+    'feat.eyebrow': 'Почему этот инструмент', 'feat.title': 'Ключи, которым можно доверять',
+    'feat.sub': 'Он создаёт настоящие приватные ключи, поэтому сделан маленьким, проверяемым и предсказуемым.',
+    'f1.t': 'Ноль зависимостей', 'f1.d': 'Только встроенные модули Node.js. Никаких сетевых запросов — ключи не покидают компьютер.',
+    'f2.t': 'Шифрование результата', 'f2.d': 'Спрашивает пароль до начала поиска и сохраняет мнемонику в зашифрованный файл.',
+    'f3.t': 'Все ядра процессора', 'f3.d': 'Параллельный поиск в worker-потоках с прогрессом, скоростью и ожидаемым временем.',
+    'f4.t': 'Проверяемые релизы', 'f4.d': 'Публикуется из CI с npm provenance. Криптография сверена с эталонными векторами @ton.',
+    'how.eyebrow': 'Как работает', 'how.title': 'Три команды — один кошелёк',
+    'how.sub': 'Нужен Node.js 22 или новее. Глобально ничего ставить не нужно.',
+    's1.t': 'Выберите концовку', 's1.d': 'Латинские буквы, цифры, «-» и «_». Регистр важен: abc ≠ ABC.',
+    's2.t': 'Запустите поиск', 's2.d': 'Задайте пароль и следите за прогрессом. Ctrl+C аккуратно останавливает поиск.',
+    's3.t': 'Импортируйте и проверьте', 's3.d': 'Расшифруйте файл, импортируйте 24 слова в кошелёк и сверьте адрес.',
+    'est.eyebrow': 'Оценка времени', 'est.title': 'Сколько ждать?',
+    'est.sub': 'Каждый новый символ увеличивает объём работы в 64 раза. Каждая попытка — намеренно медленный вывод ключа: около 8 адресов в секунду на ядро.',
+    'est.label': 'Желаемая концовка', 'est.cores': 'Ядра процессора',
+    'est.attempts': 'Попыток в среднем', 'est.speed': 'Скорость',
+    'est.note': 'Это среднее, а не обещание: реальное время сильно отличается в обе стороны.',
+    'ver.eyebrow': 'Версии кошельков', 'ver.title': 'Выберите версию вашего кошелька',
+    'ver.sub': 'Одни и те же 24 слова дают разный адрес для каждой версии контракта. Ищите в той, что использует ваше приложение.',
+    'ver.c1': 'Флаг', 'ver.c2': 'Контракт', 'ver.c3': 'Где используется', 'ver.default': 'по умолчанию в CLI',
+    'ver.r1': 'Tonkeeper, Telegram Wallet, MyTonWallet', 'ver.r2': 'Широко поддерживается; по умолчанию в библиотеке', 'ver.r3': 'Устаревший, но импортируется в большинство кошельков',
+    'safe.t': '⚠ Обращайтесь с результатом как с наличными',
+    'safe.1': 'Запускайте на доверенном компьютере — не в CI и не в общей среде.',
+    'safe.2': 'Храните зашифрованный файл; не выводите мнемонику туда, где пишутся логи.',
+    'safe.3': 'Перед отправкой средств импортируйте слова и убедитесь, что кошелёк показывает именно найденный адрес.',
+    'foot.thanks': 'Сэкономил вам время? Небольшая благодарность очень помогает 💙',
+    // estimator strings
+    'u.s': 'сек', 'u.m': 'мин', 'u.h': 'ч', 'u.d': 'дн', 'u.y': 'лет', 'u.ps': 'адр/с',
+    'h.bad': 'Допустимы только A–Z, a–z, 0–9, «-» и «_»', 'h.empty': 'Введите концовку',
+    'h.len': n => `${n} симв. · 64^${n}`,
+  };
+  const EN_EXTRA = {
+    'copied': 'Copied', 'u.s': 'sec', 'u.m': 'min', 'u.h': 'h', 'u.d': 'days', 'u.y': 'years', 'u.ps': 'addr/s',
+    'h.bad': 'Only A–Z, a–z, 0–9, “-” and “_” are allowed', 'h.empty': 'Type an ending',
+    'h.len': n => `${n} char${n > 1 ? 's' : ''} · 64^${n}`,
+  };
+
+  // Snapshot the English text from the markup once, so the HTML stays the single EN source.
+  const EN = { ...EN_EXTRA, 'meta.title': document.title,
+    'meta.desc': document.querySelector('meta[name=description]').content };
+  document.querySelectorAll('[data-i18n]').forEach(el => { EN[el.dataset.i18n] = el.textContent; });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { EN[el.dataset.i18nHtml] = el.innerHTML; });
+
+  let lang = 'en';
+  const t = k => (lang === 'ru' ? RU : EN)[k] ?? EN[k] ?? k;
+
+  function setLang(next, save) {
+    lang = next === 'ru' ? 'ru' : 'en';
+    document.documentElement.lang = lang;
+    document.title = t('meta.title');
+    document.querySelector('meta[name=description]').content = t('meta.desc');
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+    document.querySelectorAll('.lang button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+    if (save) {
+      try { localStorage.setItem('lang', lang); } catch {}
+      const u = new URL(location.href); u.searchParams.set('lang', lang); history.replaceState(null, '', u);
+    }
+    estimate();
+  }
+
+  function initialLang() {
+    const q = new URLSearchParams(location.search).get('lang');
+    if (q === 'ru' || q === 'en') return q;
+    try { const s = localStorage.getItem('lang'); if (s) return s; } catch {}
+    return (navigator.languages || [navigator.language]).some(l => /^(ru|uk|be|kk)\b/i.test(l || '')) ? 'ru' : 'en';
+  }
+
+  document.querySelectorAll('.lang button').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang, true)));
+
+  // ---------- copy buttons ----------
+  document.querySelectorAll('.copy').forEach(b => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(b.dataset.copy); } catch { return; }
+    b.textContent = t('copied'); b.classList.add('ok');
+    setTimeout(() => { b.textContent = t('copy'); b.classList.remove('ok'); }, 1400);
+  }));
+
+  // ---------- estimator ----------
+  const $ = id => document.getElementById(id);
+  const ALPH = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  const rnd = n => Array.from({ length: n }, () => ALPH[Math.random() * 64 | 0]).join('');
+  const fakeHead = 'UQ' + rnd(46);
+
+  function fmtNum(n) { return n.toLocaleString(lang === 'ru' ? 'ru-RU' : 'en-US'); }
+  function fmtTime(s) {
+    const units = [['u.y', 31557600], ['u.d', 86400], ['u.h', 3600], ['u.m', 60], ['u.s', 1]];
+    for (const [k, v] of units) if (s >= v || k === 'u.s') {
+      const x = s / v;
+      return '≈ ' + (x >= 100 ? fmtNum(Math.round(x)) : x.toFixed(x >= 10 ? 0 : 1).replace('.', lang === 'ru' ? ',' : '.')) + ' ' + t(k);
+    }
+  }
+  function estimate() {
+    const end = $('end').value, cores = +$('cores').value;
+    $('coresVal').textContent = cores;
+    const hint = $('hint');
+    if (!end) { hint.textContent = t('h.empty'); hint.className = 'hint'; }
+    else if (!/^[A-Za-z0-9_-]+$/.test(end)) { hint.textContent = t('h.bad'); hint.className = 'hint bad'; }
+    else { hint.textContent = t('h.len')(end.length); hint.className = 'hint'; }
+    const ok = end && /^[A-Za-z0-9_-]+$/.test(end);
+    const head = fakeHead.slice(0, 48 - (end.length || 0));
+    $('preview').innerHTML = ok ? head + '<b>' + end + '</b>' : head;
+    if (!ok) { $('time').textContent = '—'; $('attempts').textContent = '—'; $('speed').textContent = '—'; return; }
+    const attempts = 64 ** end.length, speed = 8 * cores;
+    $('time').textContent = fmtTime(attempts / speed);
+    $('attempts').textContent = fmtNum(attempts);
+    $('speed').textContent = '~' + fmtNum(speed) + ' ' + t('u.ps');
+  }
+  $('end').addEventListener('input', estimate);
+  $('cores').addEventListener('input', estimate);
+
+  // ---------- terminal animation ----------
+  const term = $('term');
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const sleep = ms => new Promise(r => setTimeout(r, reduce ? 0 : ms));
+  async function run() {
+    for (;;) {
+      const target = 'cafe';
+      let lines = [];
+      const draw = extra => { term.innerHTML = lines.join('\n') + (extra ?? '\n<span class="cursor"></span>'); };
+      let cmd = '';
+      for (const ch of 'npx tonwf ' + target) { cmd += ch; lines = ['<span class="t-acc">$</span> ' + esc(cmd)]; draw(''); await sleep(55); }
+      await sleep(300);
+      lines.push('<span class="t-dim">Wallet v5r1 · 8 workers · ending "' + target + '"</span>');
+      lines.push('Password: <span class="t-dim">••••••••••</span>');
+      draw(); await sleep(500);
+      const base = lines.length;
+      let attempts = 0;
+      for (let i = 0; i < 26; i++) {
+        attempts += 64 + (Math.random() * 40 | 0);
+        lines.length = base;
+        lines.push('<span class="t-dim">…' + esc(rnd(18)) + '</span>');
+        lines.push('<span class="t-dim">attempts</span> ' + attempts.toLocaleString('en-US') +
+          '  <span class="t-dim">speed</span> 64/s  <span class="t-dim">eta</span> ~1h');
+        draw(); await sleep(90);
+      }
+      lines.length = base;
+      const addr = 'UQ' + rnd(42);
+      lines.push('<span class="t-ok">✔ Found after ' + (attempts * 97).toLocaleString('en-US') + ' attempts</span>');
+      lines.push('');
+      lines.push('<span class="t-dim">address</span>  ' + esc(addr.slice(0, 22)) + '…' + esc(addr.slice(-4)) + '<span class="t-hit">' + target + '</span>');
+      lines.push('<span class="t-dim">saved to</span> ton_wallet_results.enc.json');
+      draw();
+      if (reduce) return;
+      await sleep(5200);
+    }
+  }
+
+  setLang(initialLang(), false);
+  run();
+})();
+</script>
+</body>
+</html>
