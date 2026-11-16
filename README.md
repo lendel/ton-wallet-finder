@@ -12,7 +12,7 @@
 Generates fresh wallets until one has an address ending with the string you choose — for example
 `EQ…cafe`.
 
-**English** · [Русский](README.ru.md)
+**English** · [Русский](README.ru.md) · 🌐 [Website](https://lendel.github.io/ton-wallet-finder/en/)
 
 ## Why this library
 

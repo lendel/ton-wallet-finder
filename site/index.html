@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TON Wallet Finder</title>
+<meta name="description" content="Vanity address generator for TON: find a wallet address ending with any word you choose.">
+<link rel="alternate" hreflang="en" href="https://lendel.github.io/ton-wallet-finder/en/">
+<link rel="alternate" hreflang="ru" href="https://lendel.github.io/ton-wallet-finder/ru/">
+<link rel="alternate" hreflang="kk" href="https://lendel.github.io/ton-wallet-finder/kk/">
+<link rel="alternate" hreflang="x-default" href="https://lendel.github.io/ton-wallet-finder/">
+<meta name="color-scheme" content="dark light">
+<script>
+  // Pick a language: the one chosen before, else the browser's, else English.
+  (() => {
+    const known = ['en', 'ru', 'kk'];
+    let lang;
+    try { lang = localStorage.getItem('lang'); } catch { /* storage blocked */ }
+    if (!known.includes(lang)) {
+      const prefs = (navigator.languages || [navigator.language]).map(l => String(l).toLowerCase().slice(0, 2));
+      lang = prefs.map(l => (l === 'uk' || l === 'be' ? 'ru' : l)).find(l => known.includes(l)) || 'en';
+    }
+    location.replace(lang + '/' + location.hash);
+  })();
+</script>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0b1220; color: #e8eef8;
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: #4dc3ff; margin: 0 10px; }
+</style>
+</head>
+<body>
+  <p>TON Wallet Finder: <a href="en/" hreflang="en">English</a> <a href="ru/" hreflang="ru">Русский</a> <a href="kk/" hreflang="kk">Қазақша</a></p>
+</body>
+</html>

@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a few-line wrapper that starts this package's CLI, so the short name works without a global
   install. It has no logic of its own and depends on `ton-wallet-finder@^6.2.0`; versioned and
   released separately (tags `tonwf-vX.Y.Z`, workflow `publish-tonwf.yml`).
+- **Project website.** A static landing page in English, Russian and Kazakh
+  ([`site/`](site)), published to <https://lendel.github.io/ton-wallet-finder/> by the new
+  `pages.yml` workflow. Plain HTML/CSS/JS with no external requests; it includes a search-time
+  estimator. Not part of the npm package.
 
 ---
 
