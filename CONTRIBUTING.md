@@ -155,10 +155,13 @@ It is released on its own, rarely:
   Minor and patch releases of the main package reach `npx tonwf` users automatically.
 - **How:** bump `packages/tonwf/package.json`, merge, then
   `git tag tonwf-vX.Y.Z && git push origin tonwf-vX.Y.Z` — `publish-tonwf.yml` publishes it.
-- **First publish (done once, by hand):** npm only lets you register a trusted publisher for a
-  package that exists, so version 1.0.0 is published locally:
-  `cd packages/tonwf && npm publish --access public`. Then register the trusted publisher for
-  `tonwf` exactly as below, but with workflow `publish-tonwf.yml`.
+- **First publish (done once):** npm only lets you register a trusted publisher for a
+  package that exists, so version 1.0.0 is published with a temporary token:
+  1. On npmjs.com create a *Granular Access Token* (read and write, all packages, shortest
+     expiry, *Bypass 2FA*) and save it as the repository secret `NPM_TOKEN`.
+  2. Run **Publish tonwf to npm** manually from the *Actions* tab on `main`.
+  3. Register the trusted publisher for `tonwf` exactly as below, but with workflow
+     `publish-tonwf.yml`; then delete the `NPM_TOKEN` secret and revoke the token.
 
 ### Authentication: npm trusted publishing (OIDC)
 

@@ -2,8 +2,9 @@ name: Publish tonwf to npm
 
 # Publishes packages/tonwf (the `npx tonwf` short-name package) with npm Trusted
 # Publishing, like publish.yml does for the main package. Triggered by tags
-# `tonwf-vX.Y.Z`. The very first version was published by hand, because npm only
-# lets you register a trusted publisher for a package that already exists.
+# `tonwf-vX.Y.Z`. npm only lets you register a trusted publisher for a package that
+# already exists, so the very first version is published with a temporary token
+# (see the Publish step and CONTRIBUTING.md).
 on:
   push:
     tags:
@@ -48,3 +49,9 @@ jobs:
 
       - name: Publish
         run: npm publish --provenance --access public
+        env:
+          # Only for the very first publish, before a trusted publisher can be registered:
+          # a temporary granular token in the NPM_TOKEN repository secret. Once the trusted
+          # publisher is set up, delete the secret; this then expands to an empty value and
+          # npm authenticates through OIDC as usual.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
