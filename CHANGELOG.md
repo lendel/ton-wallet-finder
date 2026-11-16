@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Project website.** A static landing page in English, Russian and Kazakh
   ([`site/`](site)), published to <https://lendel.github.io/ton-wallet-finder/> by the new
   `pages.yml` workflow. Plain HTML/CSS/JS with no external requests; it includes a search-time
-  estimator. Not part of the npm package.
+  estimator and Open Graph link previews (a shared image for the root URL, a localised one per
+  language). Not part of the npm package.
 
 ---
 
