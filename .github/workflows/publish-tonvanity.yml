@@ -1,25 +1,25 @@
-name: Publish tonwf to npm
+name: Publish tonvanity to npm
 
-# Publishes packages/tonwf (the `npx tonwf` short-name package) with npm Trusted
+# Publishes packages/tonvanity (the `npx tonvanity` short-name package) with npm Trusted
 # Publishing, like publish.yml does for the main package. Triggered by tags
-# `tonwf-vX.Y.Z`. npm only lets you register a trusted publisher for a package that
+# `tonvanity-vX.Y.Z`. npm only lets you register a trusted publisher for a package that
 # already exists, so the very first version is published with a temporary token
 # (see the Publish step and CONTRIBUTING.md).
 on:
   push:
     tags:
-      - "tonwf-v*"
+      - "tonvanity-v*"
   workflow_dispatch:
 
 permissions: {}
 
 concurrency:
-  group: publish-tonwf
+  group: publish-tonvanity
   cancel-in-progress: false
 
 jobs:
   publish:
-    name: Publish tonwf
+    name: Publish tonvanity
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -27,7 +27,7 @@ jobs:
       id-token: write  # OIDC token for npm trusted publishing + provenance
     defaults:
       run:
-        working-directory: packages/tonwf
+        working-directory: packages/tonvanity
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,12 +38,12 @@ jobs:
           node-version: 24.x
           registry-url: "https://registry.npmjs.org"
 
-      - name: Check that the tag matches packages/tonwf/package.json
+      - name: Check that the tag matches packages/tonvanity/package.json
         if: github.ref_type == 'tag'
         run: |
-          PKG="tonwf-v$(node -p "require('./package.json').version")"
+          PKG="tonvanity-v$(node -p "require('./package.json').version")"
           if [ "$PKG" != "$GITHUB_REF_NAME" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match packages/tonwf version $PKG"
+            echo "Tag $GITHUB_REF_NAME does not match packages/tonvanity version $PKG"
             exit 1
           fi
 

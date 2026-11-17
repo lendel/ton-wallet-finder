@@ -73,17 +73,17 @@ npx ton-wallet-finder --decrypt ton_wallet_results.enc.json
 Ctrl+C stops the search cleanly (exit code 130). Exit codes: `0` found, `1` error, `2` invalid
 usage. `npx ton-wallet-finder --help` lists everything.
 
-**Short name.** `tonwf` is the same tool under a shorter name:
+**Short name.** `tonvanity` is the same tool under a shorter name:
 
 ```sh
-npx tonwf abc                        # without installing
+npx tonvanity abc                    # without installing
 npm install -g ton-wallet-finder     # or install once…
-tonwf abc                            # …and use it directly
+tonvanity abc                        # …and use it directly
 ```
 
-`npx tonwf` runs the [`tonwf`](https://www.npmjs.com/package/tonwf) package, a tiny wrapper
-published from this repository ([`packages/tonwf`](packages/tonwf)) that starts this CLI.
-Do not use `npx twf`: that is an unrelated package.
+`npx tonvanity` runs the [`tonvanity`](https://www.npmjs.com/package/tonvanity) package, a tiny
+wrapper published from this repository ([`packages/tonvanity`](packages/tonvanity)) that starts
+this CLI. Do not use `npx twf`: that is an unrelated package.
 
 ## Library quick start
 

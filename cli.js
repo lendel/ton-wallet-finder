@@ -22,7 +22,7 @@ const WALLET_VERSIONS     = ['v3r2', 'v4r2', 'v5r1'];
 const HELP = `Usage: ton-wallet-finder <ending> [options]
        ton-wallet-finder --decrypt <file> [--password-env <VAR>]
 
-Short name: npx tonwf … (or tonwf … after npm i -g ton-wallet-finder).
+Short name: npx tonvanity … (or tonvanity … after npm i -g ton-wallet-finder).
 
 Find a TON wallet whose address ends with <ending> (case-sensitive; letters,
 digits, - and _). By default the result is saved to an encrypted file and the

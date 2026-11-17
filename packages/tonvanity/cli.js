@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-// `tonwf` is only a short name: it runs the command-line tool of the
+// `tonvanity` is only a short name: it runs the command-line tool of the
 // ton-wallet-finder package, which does all the work. No logic lives here.
 //
 // The tool is started as a child process (instead of require()) so that it
@@ -27,7 +27,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
 }
 
 child.on('error', err => {
-    process.stderr.write(`tonwf: could not start ton-wallet-finder: ${err.message}\n`);
+    process.stderr.write(`tonvanity: could not start ton-wallet-finder: ${err.message}\n`);
     process.exitCode = 1;
 });
 child.on('exit', (code, signal) => {

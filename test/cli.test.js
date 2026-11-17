@@ -52,7 +52,7 @@ describe('CLI', function () {
 
         it('installs both command names, pointing at the same script', () => {
             const { bin } = require('../package.json');
-            expect(bin).to.deep.equal({ 'ton-wallet-finder': 'cli.js', tonwf: 'cli.js' });
+            expect(bin).to.deep.equal({ 'ton-wallet-finder': 'cli.js', tonvanity: 'cli.js' });
             expect(fs.readFileSync(CLI, 'utf8').startsWith('#!/usr/bin/env node')).to.equal(true);
         });
 
@@ -141,16 +141,16 @@ describe('CLI', function () {
         });
     });
 
-    // packages/tonwf: the `npx tonwf` short-name package. It only forwards to this CLI, so the
+    // packages/tonvanity: the `npx tonvanity` short-name package. It only forwards to this CLI, so the
     // test installs it next to a link to this repository, the way npm would lay it out.
-    describe('tonwf wrapper package', () => {
+    describe('tonvanity wrapper package', () => {
         let wrapper;
         beforeEach(() => {
             const modules = path.join(tmpDir, 'node_modules');
             fs.mkdirSync(modules);
             fs.symlinkSync(path.join(__dirname, '..'), path.join(modules, 'ton-wallet-finder'), 'junction');
-            wrapper = path.join(tmpDir, 'tonwf-cli.js');
-            fs.copyFileSync(path.join(__dirname, '..', 'packages', 'tonwf', 'cli.js'), wrapper);
+            wrapper = path.join(tmpDir, 'tonvanity-cli.js');
+            fs.copyFileSync(path.join(__dirname, '..', 'packages', 'tonvanity', 'cli.js'), wrapper);
         });
 
         function runWrapper(args) {
@@ -184,10 +184,10 @@ describe('CLI', function () {
         });
 
         it('depends on the current major of ton-wallet-finder', () => {
-            const wrapperPkg = require('../packages/tonwf/package.json');
+            const wrapperPkg = require('../packages/tonvanity/package.json');
             const major = version.split('.')[0];
             expect(wrapperPkg.dependencies['ton-wallet-finder']).to.match(new RegExp(`^\\^${major}\\.`));
-            expect(wrapperPkg.bin).to.deep.equal({ tonwf: 'cli.js' });
+            expect(wrapperPkg.bin).to.deep.equal({ tonvanity: 'cli.js' });
         });
     });
 

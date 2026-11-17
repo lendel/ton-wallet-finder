@@ -10,15 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **`npx tonwf`.** New npm package [`tonwf`](packages/tonwf), published from this repository:
-  a few-line wrapper that starts this package's CLI, so the short name works without a global
-  install. It has no logic of its own and depends on `ton-wallet-finder@^6.2.0`; versioned and
-  released separately (tags `tonwf-vX.Y.Z`, workflow `publish-tonwf.yml`).
+- **`npx tonvanity`.** New npm package [`tonvanity`](packages/tonvanity), published from this
+  repository: a few-line wrapper that starts this package's CLI, so the short name works without
+  a global install. It has no logic of its own and depends on `ton-wallet-finder@^6.2.0`;
+  versioned and released separately (tags `tonvanity-vX.Y.Z`, workflow `publish-tonvanity.yml`).
+  It was first planned as `tonwf`, but npm rejects that name as too similar to an existing
+  package.
 - **Project website.** A static landing page in English, Russian and Kazakh
   ([`site/`](site)), published to <https://lendel.github.io/ton-wallet-finder/> by the new
   `pages.yml` workflow. Plain HTML/CSS/JS with no external requests; it includes a search-time
   estimator and Open Graph link previews (a shared image for the root URL, a localised one per
   language). Not part of the npm package.
+
+### Changed
+- **Short CLI command renamed `tonwf` → `tonvanity`.** A global install now provides
+  `ton-wallet-finder` and `tonvanity`; the `tonwf` command added in 6.2.0 is removed, so the
+  short name is the same with and without `npx`.
 
 ---
 
