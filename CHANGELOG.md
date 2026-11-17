@@ -9,10 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [7.0.0] — 2026-11-17
+
+Addresses are now found and printed in the wallet form `UQ…` that wallet apps show, the short
+command is `tonvanity` (also as `npx tonvanity`), and the project has a website. Two breaking
+changes; pass `bounceable: true` / `--bounceable` to keep the old address form. Upgrade notes:
+[MIGRATION 6.x → 7.0](docs/MIGRATION.md#6x--70).
+
 ### Added
 - **`npx tonvanity`.** New npm package [`tonvanity`](packages/tonvanity), published from this
   repository: a few-line wrapper that starts this package's CLI, so the short name works without
-  a global install. It has no logic of its own and depends on `ton-wallet-finder@^6.2.0`;
+  a global install. It has no logic of its own and depends on `ton-wallet-finder@^7.0.0`;
   versioned and released separately (tags `tonvanity-vX.Y.Z`, workflow `publish-tonvanity.yml`).
   It was first planned as `tonwf`, but npm rejects that name as too similar to an existing
   package.
