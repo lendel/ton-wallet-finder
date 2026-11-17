@@ -105,11 +105,11 @@ describe('findWalletWithEnding({ workers })', () => {
 
         afterEach(() => sinon.restore());
 
-        it('should spawn exactly `workers` workers with targetEnding, showProcess and walletVersion', async () => {
+        it('should spawn exactly `workers` workers with targetEnding, showProcess, walletVersion and bounceable', async () => {
             const p = finder.findWalletWithEnding({ workers: 3 });
             expect(spawned).to.have.lengthOf(3);
             expect(spawned[0].workerData).to.deep.equal({
-                targetEnding: 'A', showProcess: false, walletVersion: 'v4r2', reportProgress: false,
+                targetEnding: 'A', showProcess: false, walletVersion: 'v4r2', bounceable: false, reportProgress: false,
             });
             spawned[1].emit('message', {
                 type: 'found', publicKey: Buffer.alloc(32, 1), secretKey: Buffer.alloc(64, 2),
@@ -274,7 +274,18 @@ describe('findWalletWithEnding({ workers })', () => {
             const result = await finder.findWalletWithEnding({ workers: 2 });
             expect(result.walletAddress.endsWith('A')).to.equal(true);
             const { walletV5R1Address } = require('../index')._internals;
-            expect(walletV5R1Address(Buffer.from(result.publicKey, 'hex'))).to.equal(result.walletAddress);
+            expect(result.walletAddress.startsWith('UQ')).to.equal(true);
+            expect(walletV5R1Address(Buffer.from(result.publicKey, 'hex'), 0, false)).to.equal(result.walletAddress);
+        });
+
+        it('should pass bounceable through to the workers', async function () {
+            this.timeout(60000);
+            const finder = new TonWalletFinder('A', { bounceable: true });
+            const result = await finder.findWalletWithEnding({ workers: 2 });
+            expect(result.walletAddress.startsWith('EQ')).to.equal(true);
+            expect(result.walletAddress.endsWith('A')).to.equal(true);
+            const { walletV4Address } = require('../index')._internals;
+            expect(walletV4Address(Buffer.from(result.publicKey, 'hex'))).to.equal(result.walletAddress);
         });
     });
 });

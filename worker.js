@@ -19,7 +19,7 @@ const { mnemonicNewSync, mnemonicToPrivateKeySync, walletAddress } = _internals;
 // Same policy as the single-threaded loop in index.js.
 const MAX_CONSECUTIVE_ERRORS = 5;
 
-async function searchLoop({ targetEnding, showProcess, walletVersion, reportProgress }) {
+async function searchLoop({ targetEnding, showProcess, walletVersion, bounceable = false, reportProgress }) {
     let consecutiveErrors = 0;
     while (true) {
         let keyPair;
@@ -28,7 +28,7 @@ async function searchLoop({ targetEnding, showProcess, walletVersion, reportProg
         try {
             words   = mnemonicNewSync();
             keyPair = mnemonicToPrivateKeySync(words);
-            address = walletAddress(walletVersion, keyPair.publicKey);
+            address = walletAddress(walletVersion, keyPair.publicKey, 0, bounceable);
             consecutiveErrors = 0;
         } catch (err) {
             consecutiveErrors++;

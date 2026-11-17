@@ -32,6 +32,8 @@ Options:
   -w, --wallet <version>   Wallet contract: v3r2, v4r2 or v5r1 (default: v5r1, the
                            current standard in Tonkeeper and Telegram Wallet). Must match
                            the wallet app you will import the words into.
+      --bounceable         Search the bounceable form "EQ…" instead of the wallet
+                           form "UQ…" (the ending differs between the two)
   -j, --workers <n|auto>   Worker threads (default: auto = one per CPU core)
   -o, --output <file>      File name in the current directory
                            (default: ton_wallet_results.enc.json, or .txt with --plain)
@@ -67,6 +69,7 @@ function parseCli(argv) {
             strict: true,
             options: {
                 wallet:         { type: 'string',  short: 'w' },
+                bounceable:     { type: 'boolean' },
                 workers:        { type: 'string',  short: 'j' },
                 output:         { type: 'string',  short: 'o' },
                 'password-env': { type: 'string' },
@@ -251,7 +254,11 @@ async function main(argv) {
 
     let finder;
     try {
-        finder = new TonWalletFinder(opts.ending, { walletVersion: opts.wallet, workers: opts.workers });
+        finder = new TonWalletFinder(opts.ending, {
+            walletVersion: opts.wallet,
+            workers:       opts.workers,
+            bounceable:    opts.bounceable === true,
+        });
     } catch (err) {
         process.stderr.write(`Error: ${err.message}\n`);
         return EXIT_USAGE;

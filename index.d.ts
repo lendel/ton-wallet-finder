@@ -8,7 +8,7 @@ export interface WalletResult {
     readonly privateKey: string;
     /** 24-word TON mnemonic (BIP-39 English word list, TON derivation) */
     readonly words: readonly string[];
-    /** TON wallet address in URL-safe bounceable format (e.g. EQ...) */
+    /** TON wallet address, URL-safe: non-bounceable `UQ…` by default, `EQ…` with `bounceable: true` */
     readonly walletAddress: string;
 }
 
@@ -71,6 +71,14 @@ export interface TonWalletFinderOptions {
      * must match whatever wallet software the mnemonic will actually be imported into.
      */
     readonly walletVersion?: WalletVersion;
+
+    /**
+     * Address format to search and return. Default: `false` — the non-bounceable `UQ…`
+     * form that wallet apps show for a wallet. `true` gives the bounceable `EQ…` form used
+     * for smart contracts (and by earlier versions of this library). The checksum covers
+     * the format flag, so one wallet has a different ending in each form.
+     */
+    readonly bounceable?: boolean;
 }
 
 /**
@@ -136,6 +144,8 @@ export declare class TonWalletFinder {
     readonly workers: number | 'auto';
     /** TON wallet contract version addresses are derived for */
     readonly walletVersion: WalletVersion;
+    /** Whether addresses are in bounceable (`EQ…`) rather than non-bounceable (`UQ…`) form */
+    readonly bounceable: boolean;
 
     /**
      * @param targetEnding - Desired suffix for the wallet address.
@@ -143,7 +153,8 @@ export declare class TonWalletFinder {
      *   At most 46 characters (a TON address has 46 matchable characters after the `EQ`/`UQ` tag).
      * @param options - Optional configuration.
      * @throws {Error} If `targetEnding` contains invalid characters or is longer than 46
-     *   characters, or if `walletVersion` is not a supported version.
+     *   characters, if `walletVersion` is not a supported version, or if `bounceable` is
+     *   not a boolean.
      * @throws {RangeError} If `workers` is not a positive integer or `'auto'`.
      * @throws {TypeError} If `saveResult` is not a boolean or valid `SaveOptions`.
      */
@@ -159,7 +170,7 @@ export declare class TonWalletFinder {
 
     /**
      * Derives the address (workchain 0, contract version = `walletVersion`) for a key
-     * pair and returns an address object. `toString()` always yields the bounceable, URL-safe form;
+     * pair and returns an address object. `toString()` yields the URL-safe form selected by `bounceable`;
      * the options argument is accepted for compatibility and ignored.
      * Synchronous — no I/O is performed.
      */
@@ -246,14 +257,14 @@ export declare const _internals: {
     isBasicSeed(words: readonly string[]): Promise<boolean>;
     /** Synchronous `isBasicSeed()`. */
     isBasicSeedSync(words: readonly string[]): boolean;
-    /** Bounceable, URL-safe address for a 32-byte public key and the given wallet version. */
-    walletAddress(version: WalletVersion, publicKey: Uint8Array, workchain?: number): string;
-    /** Bounceable, URL-safe WalletV3R2 address for a 32-byte public key. */
-    walletV3R2Address(publicKey: Uint8Array, workchain?: number): string;
-    /** Bounceable, URL-safe WalletV4R2 address for a 32-byte public key. */
-    walletV4Address(publicKey: Uint8Array, workchain?: number): string;
-    /** Bounceable, URL-safe WalletV5R1 (W5, mainnet wallet id) address for a 32-byte public key. */
-    walletV5R1Address(publicKey: Uint8Array, workchain?: number): string;
+    /** URL-safe address for a 32-byte public key and wallet version; bounceable (`EQ…`) unless `bounceable` is false. */
+    walletAddress(version: WalletVersion, publicKey: Uint8Array, workchain?: number, bounceable?: boolean): string;
+    /** URL-safe WalletV3R2 address for a 32-byte public key; bounceable (`EQ…`) unless `bounceable` is false. */
+    walletV3R2Address(publicKey: Uint8Array, workchain?: number, bounceable?: boolean): string;
+    /** URL-safe WalletV4R2 address for a 32-byte public key; bounceable (`EQ…`) unless `bounceable` is false. */
+    walletV4Address(publicKey: Uint8Array, workchain?: number, bounceable?: boolean): string;
+    /** URL-safe WalletV5R1 (W5, mainnet wallet id) address for a 32-byte public key; bounceable (`EQ…`) unless `bounceable` is false. */
+    walletV5R1Address(publicKey: Uint8Array, workchain?: number, bounceable?: boolean): string;
     /** TVM representation hash (SHA-256) of an ordinary cell. */
     cellHash(bitsCount: number, bitsBytes: Uint8Array, refs: ReadonlyArray<{ depth: number; hash: Uint8Array }>): Uint8Array;
     /** TVM bit padding: sets the completion bit after `bitsCount` data bits. */

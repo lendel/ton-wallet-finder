@@ -21,9 +21,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pages.yml` workflow. Plain HTML/CSS/JS with no external requests; it includes a search-time
   estimator and Open Graph link previews (a shared image for the root URL, a localised one per
   language). Not part of the npm package.
+- **`bounceable` option and `--bounceable` CLI flag** to search and return the bounceable `EQ…`
+  form, as earlier versions did. Also a 4th `bounceable` argument for the low-level
+  `_internals.walletAddress()` / `walletV*Address()` functions (default `true` there, so the
+  reference vectors are unchanged).
 
 ### Changed
-- **Short CLI command renamed `tonwf` → `tonvanity`.** A global install now provides
+- **BREAKING: addresses are now in the non-bounceable wallet form `UQ…`.** The search matches the
+  ending against, and returns, the form that Tonkeeper, Telegram Wallet and other apps show for a
+  wallet. The checksum covers the form flag, so the same wallet has a different ending as `EQ…`;
+  pass `bounceable: true` (CLI: `--bounceable`) for the old behaviour. Keys, mnemonics and
+  wallets are derived exactly as before. See [MIGRATION](docs/MIGRATION.md#6x--70).
+- **BREAKING: short CLI command renamed `tonwf` → `tonvanity`.** A global install now provides
   `ton-wallet-finder` and `tonvanity`; the `tonwf` command added in 6.2.0 is removed, so the
   short name is the same with and without `npx`.
 
