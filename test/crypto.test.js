@@ -181,6 +181,34 @@ describe('crypto primitives (reference vectors)', () => {
         it('should throw on an unknown version', () => {
             expect(() => walletAddress('v2r2', pubkey)).to.throw(Error, /Unsupported wallet version/);
         });
+
+        // The non-bounceable ("UQ…") form encodes the same account: same workchain and hash,
+        // tag 0x51 instead of 0x11, and a CRC recomputed over the new tag.
+        const decode = a => Buffer.from(a.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+
+        it('should encode the same account in non-bounceable form when bounceable is false', () => {
+            for (const [version, reference] of [['v3r2', VECTOR.addressV3R2], ['v4r2', VECTOR.address], ['v5r1', VECTOR.addressV5R1]]) {
+                const uq = walletAddress(version, pubkey, 0, false);
+                expect(uq).to.match(/^UQ[A-Za-z0-9_-]{46}$/);
+                const raw = decode(uq);
+                const ref = decode(reference);
+                expect(raw[0]).to.equal(0x51);
+                expect(raw.subarray(1, 34).equals(ref.subarray(1, 34))).to.equal(true);
+                expect(raw.readUInt16BE(34)).to.equal(crc16(raw.subarray(0, 34)));
+                expect(uq.slice(-3)).to.not.equal(reference.slice(-3)); // checksum changes the ending
+            }
+        });
+
+        it('should keep the bounceable form as the default of the low-level function', () => {
+            expect(walletAddress('v4r2', pubkey, 0, true)).to.equal(VECTOR.address);
+        });
+
+        it('should match the checksum of a real non-bounceable wallet address', () => {
+            // The project's own donation wallet, as shown by Tonkeeper.
+            const raw = decode('UQA7h7IS4PvdaWi_0-77XfNRpZSLcDev4erumQpl5fbUJSau');
+            expect(raw[0]).to.equal(0x51);
+            expect(raw.readUInt16BE(34)).to.equal(crc16(raw.subarray(0, 34)));
+        });
     });
 
     describe('cellHash()', () => {

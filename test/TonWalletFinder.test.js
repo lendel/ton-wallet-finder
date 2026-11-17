@@ -113,6 +113,16 @@ describe('TonWalletFinder', () => {
             }
         });
 
+        it('should default bounceable to false and accept true', () => {
+            expect(new TonWalletFinder('x').bounceable).to.equal(false);
+            expect(new TonWalletFinder('x', { bounceable: true }).bounceable).to.equal(true);
+        });
+
+        it('should throw on a non-boolean bounceable', () => {
+            expect(() => new TonWalletFinder('x', { bounceable: 'yes' })).to.throw(Error, /bounceable/);
+            expect(() => new TonWalletFinder('x', { bounceable: 1 })).to.throw(Error, /bounceable/);
+        });
+
         it('should throw on an unsupported walletVersion', () => {
             expect(() => new TonWalletFinder('x', { walletVersion: 'v4' })).to.throw(Error, /walletVersion/);
             expect(() => new TonWalletFinder('x', { walletVersion: 'V4R2' })).to.throw(Error, /walletVersion/);
@@ -164,22 +174,27 @@ describe('TonWalletFinder', () => {
             expect(typeof result.toString).to.equal('function');
         });
 
-        it('should produce a bounceable URL-safe address starting with EQ or UQ and 48 chars long', async () => {
+        it('should produce a non-bounceable URL-safe address (UQ…, 48 chars) by default', async () => {
             const finder = new TonWalletFinder('a');
             const { keyPair } = await finder.createKeyPair();
-            const address = finder.createWallet(keyPair);
-            const str = address.toString({ urlSafe: true, bounceable: true });
-            expect(str).to.match(/^(EQ|UQ)/);
-            expect(str).to.have.lengthOf(48);
+            const str = finder.createWallet(keyPair).toString();
+            expect(str).to.match(/^UQ[A-Za-z0-9_-]{46}$/);
+        });
+
+        it('should produce the bounceable form (EQ…) with bounceable: true', async () => {
+            const finder = new TonWalletFinder('a', { bounceable: true });
+            const { keyPair } = await finder.createKeyPair();
+            expect(finder.createWallet(keyPair).toString()).to.match(/^EQ[A-Za-z0-9_-]{46}$/);
         });
 
         it('should derive the address for the configured walletVersion', async () => {
             const { walletV3R2Address, walletV4Address, walletV5R1Address } = require('../index')._internals;
             const { keyPair } = await new TonWalletFinder('a').createKeyPair();
             const pubkey = Buffer.from(keyPair.publicKey);
-            expect(new TonWalletFinder('a', { walletVersion: 'v3r2' }).createWallet(keyPair).toString()).to.equal(walletV3R2Address(pubkey));
-            expect(new TonWalletFinder('a').createWallet(keyPair).toString()).to.equal(walletV4Address(pubkey));
-            expect(new TonWalletFinder('a', { walletVersion: 'v5r1' }).createWallet(keyPair).toString()).to.equal(walletV5R1Address(pubkey));
+            expect(new TonWalletFinder('a', { walletVersion: 'v3r2' }).createWallet(keyPair).toString()).to.equal(walletV3R2Address(pubkey, 0, false));
+            expect(new TonWalletFinder('a').createWallet(keyPair).toString()).to.equal(walletV4Address(pubkey, 0, false));
+            expect(new TonWalletFinder('a', { walletVersion: 'v5r1' }).createWallet(keyPair).toString()).to.equal(walletV5R1Address(pubkey, 0, false));
+            expect(new TonWalletFinder('a', { bounceable: true }).createWallet(keyPair).toString()).to.equal(walletV4Address(pubkey));
         });
     });
 

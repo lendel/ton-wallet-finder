@@ -10,7 +10,7 @@
 
 **Vanity address generator for the TON blockchain** — a command-line tool and a Node.js library.
 Generates fresh wallets until one has an address ending with the string you choose — for example
-`EQ…cafe`.
+`UQ…cafe`.
 
 **English** · [Русский](README.ru.md) · 🌐 [Website](https://lendel.github.io/ton-wallet-finder/en/)
 
@@ -62,6 +62,7 @@ npx ton-wallet-finder --decrypt ton_wallet_results.enc.json
 | Option | Description |
 |---|---|
 | `-w, --wallet <v3r2\|v4r2\|v5r1>` | Wallet contract (default `v5r1`, the current standard in Tonkeeper and Telegram Wallet); must match your wallet app |
+| `--bounceable` | Search the bounceable form `EQ…` instead of the wallet form `UQ…` ([address format](#address-format)) |
 | `-j, --workers <n\|auto>` | Worker threads (default `auto`: one per CPU core) |
 | `-o, --output <file>` | File name in the current directory |
 | `--password-env <VAR>` | Take the password from an environment variable instead of asking (for scripts) |
@@ -111,7 +112,7 @@ CommonJS works too: `const { TonWalletFinder } = require('ton-wallet-finder');`
 | `walletVersion` | Contract | Notes |
 |---|---|---|
 | `'v3r2'` | WalletV3R2 | Legacy contract, still importable in most wallets |
-| `'v4r2'` | WalletV4R2 | **Default.** Same addresses as every previous release |
+| `'v4r2'` | WalletV4R2 | **Default.** Same wallets as every previous release |
 | `'v5r1'` | WalletV5R1 (W5) | Current default in Tonkeeper, MyTonWallet and others. Mainnet wallet id, subwallet 0 |
 
 > **The same mnemonic gives a different address for every version.** The address you find
@@ -119,10 +120,23 @@ CommonJS works too: `const { TonWalletFinder } = require('ton-wallet-finder');`
 > you will import the words into. If unsure, check which address your wallet shows for an
 > existing seed phrase.
 
+## Address format
+
+A TON address can be written in two forms that point to the **same wallet**:
+
+| Form | Starts with | Used for |
+|---|---|---|
+| Non-bounceable | `UQ…` | **Default.** Wallets: what Tonkeeper, Telegram Wallet and other apps show and share |
+| Bounceable | `EQ…` | Smart contracts; set `bounceable: true` (CLI: `--bounceable`) |
+
+The last characters of an address are a checksum that covers the form, so the **ending differs
+between the two**: a wallet found as `UQ…cafe` has a different ending in its `EQ…` form. Search
+in the form people will see. Versions before 7.0 always searched the `EQ…` form.
+
 ## Options
 
 ```js
-new TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers, walletVersion });
+new TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers, walletVersion, bounceable });
 ```
 
 | Option | Type | Default | Description |
@@ -133,6 +147,7 @@ new TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers
 | `saveResult` | `boolean \| { password?, fileName? }` | `false` | Save the result in the current directory: `true` → plain-text `ton_wallet_results.txt`; `{ password }` → encrypted `ton_wallet_results.enc.json` ([details](#encrypted-results)). Never overwrites — adds `-2`, `-3`, … |
 | `workers` | `number \| 'auto'` | `1` | Worker threads for the search; `'auto'` = one per CPU core. Can be overridden per call |
 | `walletVersion` | `'v3r2' \| 'v4r2' \| 'v5r1'` | `'v4r2'` | Wallet contract to derive the address for ([see above](#wallet-versions)) |
+| `bounceable` | `boolean` | `false` | `false`: search and return the wallet form `UQ…`; `true`: the bounceable form `EQ…` ([address format](#address-format)) |
 
 Invalid options throw at construction time.
 
@@ -144,7 +159,7 @@ Generates wallets until one matches and resolves with:
 
 | Field | Type | Description |
 |---|---|---|
-| `walletAddress` | `string` | Bounceable, URL-safe address (`EQ…abc`) |
+| `walletAddress` | `string` | URL-safe address: `UQ…abc`, or `EQ…abc` with `bounceable: true` |
 | `words` | `string[]` | 24-word TON mnemonic |
 | `publicKey` | `string` | Ed25519 public key, hex |
 | `privateKey` | `string` | Ed25519 secret key (seed ‖ public key), hex |

@@ -225,14 +225,15 @@ function crc16(data) {
 
 /**
  * Hash a StateInit { code, data } (no split_depth / special / library) and
- * encode the resulting account id as a bounceable, URL-safe address (48 chars).
+ * encode the resulting account id as a URL-safe user-friendly address (48 chars).
  *
  * @param {{ hash: Buffer, depth: number }} code   - pre-computed code cell constants
  * @param {number} dataBits                        - data cell length in bits
  * @param {Buffer} dataBuf                         - data cell bits, unpadded
  * @param {number} workchain
+ * @param {boolean} bounceable                     - true: "EQ…" (contracts), false: "UQ…" (wallets)
  */
-function stateInitAddress(code, dataBits, dataBuf, workchain) {
+function stateInitAddress(code, dataBits, dataBuf, workchain, bounceable) {
     // The data cells of all supported wallets have no refs, so their depth is 0.
     const dataHash  = cellHash(dataBits, padBits(dataBits, dataBuf), []);
     const dataDepth = 0;
@@ -247,7 +248,9 @@ function stateInitAddress(code, dataBits, dataBuf, workchain) {
 
     // ---- User-friendly address: [tag, wc, hash(32), crc16(2)] => base64url ----
     const addr = Buffer.alloc(36);
-    addr[0] = 0x11;                    // bounceable flag
+    // Tag 0x11 = bounceable ("EQ…"), 0x51 = non-bounceable ("UQ…"). The tag is covered by the
+    // CRC, so the two forms of one account also differ in their last characters.
+    addr[0] = bounceable ? 0x11 : 0x51;
     addr.writeInt8(workchain, 1);      // workchain (signed byte)
     siHash.copy(addr, 2);
 
@@ -260,36 +263,36 @@ function stateInitAddress(code, dataBits, dataBuf, workchain) {
 
 /**
  * Derive a WalletV3R2 address from a 32-byte Ed25519 public key.
- * Returns a bounceable, URL-safe base64 string (48 chars).
+ * Returns a URL-safe base64 string (48 chars), bounceable ("EQ…") unless `bounceable` is false.
  */
-function walletV3R2Address(pubkey, workchain = 0) {
+function walletV3R2Address(pubkey, workchain = 0, bounceable = true) {
     // ---- Data cell: seqno(32) | subwallet_id(32) | pubkey(256) = 320 bits (byte-aligned) ----
     const dataBuf = Buffer.alloc(40, 0);
     dataBuf.writeUInt32BE(0,                                   0);  // seqno
     dataBuf.writeUInt32BE(DEFAULT_SUBWALLET_ID + workchain,    4);  // subwallet_id
     dataBuf.set(pubkey, 8);                                         // 32 bytes public key
-    return stateInitAddress(WALLET_CODE.v3r2, 320, dataBuf, workchain);
+    return stateInitAddress(WALLET_CODE.v3r2, 320, dataBuf, workchain, bounceable);
 }
 
 /**
  * Derive a WalletV4R2 address from a 32-byte Ed25519 public key.
- * Returns a bounceable, URL-safe base64 string (48 chars).
+ * Returns a URL-safe base64 string (48 chars), bounceable ("EQ…") unless `bounceable` is false.
  */
-function walletV4Address(pubkey, workchain = 0) {
+function walletV4Address(pubkey, workchain = 0, bounceable = true) {
     // ---- Data cell: seqno(32) | subwallet_id(32) | pubkey(256) | has_plugins(1) ----
     // Total = 321 bits; has_plugins = 0, padBits() sets the trailing "1" completion bit.
     const dataBuf = Buffer.alloc(41, 0);
     dataBuf.writeUInt32BE(0,                                   0);  // seqno
     dataBuf.writeUInt32BE(DEFAULT_SUBWALLET_ID + workchain,    4);  // subwallet_id
     dataBuf.set(pubkey, 8);                                         // 32 bytes public key
-    return stateInitAddress(WALLET_CODE.v4r2, 321, dataBuf, workchain);
+    return stateInitAddress(WALLET_CODE.v4r2, 321, dataBuf, workchain, bounceable);
 }
 
 /**
  * Derive a WalletV5R1 (W5) address from a 32-byte Ed25519 public key.
- * Returns a bounceable, URL-safe base64 string (48 chars).
+ * Returns a URL-safe base64 string (48 chars), bounceable ("EQ…") unless `bounceable` is false.
  */
-function walletV5R1Address(pubkey, workchain = 0) {
+function walletV5R1Address(pubkey, workchain = 0, bounceable = true) {
     // wallet_id = client_context XOR network_global_id, both as int32.
     // client_context = 1 | workchain:int8 | wallet_version:uint8 (0 = v5r1) | subwallet_number:uint15 (0)
     const context  = (0x80000000 | ((workchain & 0xff) << 23)) >>> 0;
@@ -310,7 +313,7 @@ function walletV5R1Address(pubkey, workchain = 0) {
         dataBuf[i + 1] |= (tail[i] & 0x01) << 7;
     }
     // Bit 321 (extensions dict = empty) is already 0; padBits() adds the completion bit after it.
-    return stateInitAddress(WALLET_CODE.v5r1, 322, dataBuf, workchain);
+    return stateInitAddress(WALLET_CODE.v5r1, 322, dataBuf, workchain, bounceable);
 }
 
 const WALLET_ADDRESS_BY_VERSION = {
@@ -323,13 +326,16 @@ const WALLET_ADDRESS_BY_VERSION = {
  * Derive the address for a given wallet version. Different versions produce
  * different addresses from the same key — the version must match the wallet
  * software the mnemonic will be imported into.
+ *
+ * `bounceable` defaults to true here (the reference vectors use that form);
+ * TonWalletFinder passes false unless asked otherwise.
  */
-function walletAddress(version, pubkey, workchain = 0) {
+function walletAddress(version, pubkey, workchain = 0, bounceable = true) {
     const derive = WALLET_ADDRESS_BY_VERSION[version];
     if (!derive) {
         throw new Error(`Unsupported wallet version: ${JSON.stringify(version)}`);
     }
-    return derive(pubkey, workchain);
+    return derive(pubkey, workchain, bounceable);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +370,10 @@ class TonWalletFinder {
      * @param {'v3r2'|'v4r2'|'v5r1'} [options.walletVersion='v4r2'] - TON wallet contract
      *        version to derive the address for. Different versions give different addresses
      *        for the same mnemonic.
+     * @param {boolean} [options.bounceable=false]  - Address format to search and return.
+     *        false: non-bounceable "UQ…", the form wallet apps show for a wallet;
+     *        true: bounceable "EQ…" (what earlier versions used). The checksum differs between
+     *        the two, so the same wallet has a different ending in each form.
      */
     constructor(targetEnding, options = {}) {
         // Dash at end of character class avoids ambiguous range
@@ -382,6 +392,7 @@ class TonWalletFinder {
             saveResult = false,
             workers = 1,
             walletVersion = 'v4r2',
+            bounceable = false,
         } = options !== null ? options : {};
 
         if (!SUPPORTED_WALLET_VERSIONS.includes(walletVersion)) {
@@ -390,6 +401,9 @@ class TonWalletFinder {
         // Validate eagerly so a bad default fails at construction, not on first search.
         // 'auto' is deliberately not resolved here — resolveWorkerCount() re-evaluates it
         // per search so a later change in available CPUs is picked up.
+        if (typeof bounceable !== 'boolean') {
+            throw new Error(`Invalid bounceable: expected true or false, got ${JSON.stringify(bounceable)}.`);
+        }
         resolveWorkerCount(workers);
         validateSaveResult(saveResult);
 
@@ -399,6 +413,7 @@ class TonWalletFinder {
         this.saveResult    = saveResult;
         this.workers       = workers;
         this.walletVersion = walletVersion;
+        this.bounceable    = bounceable;
 
         // Number of concurrent attempts in single-threaded mode (see _searchOnMainThread).
         // Internal tuning knob, not part of the public API.
@@ -416,7 +431,7 @@ class TonWalletFinder {
     // Returns an address object with a .toString() method — same interface as
     // the original @ton/core Address so callers are unaffected.
     createWallet(keyPair) {
-        const str = walletAddress(this.walletVersion, Buffer.from(keyPair.publicKey));
+        const str = walletAddress(this.walletVersion, Buffer.from(keyPair.publicKey), 0, this.bounceable);
         return { toString: () => str };
     }
 
@@ -484,7 +499,7 @@ class TonWalletFinder {
                     let walletAddress;
                     try {
                         ({ keyPair, words } = await this.createKeyPair());
-                        walletAddress = this.createWallet(keyPair).toString({ urlSafe: true, bounceable: true });
+                        walletAddress = this.createWallet(keyPair).toString();
                     } catch (err) {
                         if (settled) { return; }
                         consecutiveErrors++;
@@ -552,6 +567,7 @@ class TonWalletFinder {
                     targetEnding:   this.targetEnding,
                     showProcess:    this.showProcess,
                     walletVersion:  this.walletVersion,
+                    bounceable:     this.bounceable,
                     reportProgress: typeof onProgress === 'function',
                 });
                 workers.push(w);

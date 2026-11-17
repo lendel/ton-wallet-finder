@@ -10,7 +10,7 @@
 
 **Генератор красивых адресов для блокчейна TON** — консольная программа и библиотека для
 Node.js. Создаёт новые кошельки, пока не найдёт тот, чей адрес заканчивается на выбранную вами
-строку — например, `EQ…cafe`.
+строку — например, `UQ…cafe`.
 
 [English](README.md) · **Русский** · 🌐 [Сайт](https://lendel.github.io/ton-wallet-finder/ru/)
 
@@ -63,6 +63,7 @@ npx ton-wallet-finder --decrypt ton_wallet_results.enc.json
 | Опция | Описание |
 |---|---|
 | `-w, --wallet <v3r2\|v4r2\|v5r1>` | Контракт кошелька (по умолчанию `v5r1` — текущий стандарт Tonkeeper и Telegram Wallet); должен совпадать с вашим приложением |
+| `--bounceable` | Искать в форме `EQ…` вместо формы кошелька `UQ…` ([формат адреса](#формат-адреса)) |
 | `-j, --workers <n\|auto>` | Число потоков (по умолчанию `auto` — по одному на ядро) |
 | `-o, --output <file>` | Имя файла в текущей директории |
 | `--password-env <VAR>` | Брать пароль из переменной окружения, а не спрашивать (для скриптов) |
@@ -112,7 +113,7 @@ CommonJS тоже работает: `const { TonWalletFinder } = require('ton-wa
 | `walletVersion` | Контракт | Примечания |
 |---|---|---|
 | `'v3r2'` | WalletV3R2 | Устаревший контракт, но импортируется большинством кошельков |
-| `'v4r2'` | WalletV4R2 | **По умолчанию.** Те же адреса, что и во всех предыдущих версиях библиотеки |
+| `'v4r2'` | WalletV4R2 | **По умолчанию.** Те же кошельки, что и во всех предыдущих версиях библиотеки |
 | `'v5r1'` | WalletV5R1 (W5) | Сейчас создаётся по умолчанию в Tonkeeper, MyTonWallet и других. Mainnet wallet id, subwallet 0 |
 
 > **Одна и та же мнемоника даёт разный адрес для каждой версии.** Найденный адрес существует
@@ -120,10 +121,23 @@ CommonJS тоже работает: `const { TonWalletFinder } = require('ton-wa
 > приложением, в которое вы импортируете слова. Если не уверены — посмотрите, какой адрес ваш
 > кошелёк показывает для уже существующей сид-фразы.
 
+## Формат адреса
+
+У TON-адреса есть две формы записи, и обе указывают на **один и тот же кошелёк**:
+
+| Форма | Начинается с | Для чего |
+|---|---|---|
+| Non-bounceable | `UQ…` | **По умолчанию.** Кошельки: так адрес показывают и пересылают Tonkeeper, Telegram Wallet и другие приложения |
+| Bounceable | `EQ…` | Смарт-контракты; включается `bounceable: true` (в CLI — `--bounceable`) |
+
+Последние символы адреса — контрольная сумма, и она зависит от формы, поэтому **окончание у двух
+форм разное**: кошелёк, найденный как `UQ…cafe`, в форме `EQ…` заканчивается иначе. Ищите в той
+форме, которую увидят люди. Версии до 7.0 всегда искали в форме `EQ…`.
+
 ## Опции
 
 ```js
-new TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers, walletVersion });
+new TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers, walletVersion, bounceable });
 ```
 
 | Опция | Тип | По умолчанию | Описание |
@@ -134,6 +148,7 @@ new TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers
 | `saveResult` | `boolean \| { password?, fileName? }` | `false` | Сохранить результат в текущей директории: `true` → открытым текстом в `ton_wallet_results.txt`; `{ password }` → зашифрованный `ton_wallet_results.enc.json` ([подробнее](#зашифрованное-сохранение)). Не перезаписывает — добавляет `-2`, `-3`, … |
 | `workers` | `number \| 'auto'` | `1` | Число worker-потоков; `'auto'` — по одному на ядро. Можно переопределить при вызове |
 | `walletVersion` | `'v3r2' \| 'v4r2' \| 'v5r1'` | `'v4r2'` | Контракт кошелька, для которого выводится адрес ([см. выше](#версии-кошелька)) |
+| `bounceable` | `boolean` | `false` | `false` — искать и возвращать форму кошелька `UQ…`; `true` — форму `EQ…` ([формат адреса](#формат-адреса)) |
 
 Неверные опции вызывают ошибку уже в конструкторе.
 
@@ -145,7 +160,7 @@ new TonWalletFinder(targetEnding, { showProcess, showResult, saveResult, workers
 
 | Поле | Тип | Описание |
 |---|---|---|
-| `walletAddress` | `string` | Bounceable URL-safe адрес (`EQ…abc`) |
+| `walletAddress` | `string` | URL-safe адрес: `UQ…abc`, с `bounceable: true` — `EQ…abc` |
 | `words` | `string[]` | 24-словная TON-мнемоника |
 | `publicKey` | `string` | Публичный ключ Ed25519, hex |
 | `privateKey` | `string` | Секретный ключ Ed25519 (seed ‖ публичный ключ), hex |

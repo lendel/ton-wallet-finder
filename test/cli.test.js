@@ -97,6 +97,15 @@ describe('CLI', function () {
             expect(saved).to.include(`Wallet: ${address}`);
         });
 
+        it('prints the wallet form (UQ…) by default and EQ… with --bounceable', async () => {
+            const uq = await run(['A', '--no-save', '--show', '-j', '2', '-q'], { cwd: tmpDir });
+            expect(uq.code).to.equal(0);
+            expect(uq.stdout.match(/Address:\s+(\S+)/)[1]).to.match(/^UQ.*A$/);
+            const eq = await run(['A', '--bounceable', '--no-save', '--show', '-j', '2', '-q'], { cwd: tmpDir });
+            expect(eq.code).to.equal(0);
+            expect(eq.stdout.match(/Address:\s+(\S+)/)[1]).to.match(/^EQ.*A$/);
+        });
+
         it('encrypts by default (--password-env) and --decrypt reads the file back', async () => {
             const env = { TWF_TEST_PW: 'correct horse battery' };
             const found = await run(['B', '--password-env', 'TWF_TEST_PW', '-o', 'w.json', '-q'], { cwd: tmpDir, env });

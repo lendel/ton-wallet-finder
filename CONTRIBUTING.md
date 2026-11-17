@@ -76,9 +76,14 @@ Tests live in `test/` (Mocha + Chai + Sinon):
 | `README.md` / `README.ru.md` | What the library is, install, quick start, options, API, performance — keep both languages in sync |
 | `docs/MIGRATION.md` / `docs/MIGRATION.ru.md` | How to upgrade between major versions — add a section for every breaking release |
 | `CHANGELOG.md` | Every change, per release (English only); becomes the GitHub Release notes |
+| `site/` | The website (EN/RU/KZ pages, shared assets), deployed by `pages.yml` — keep the three language pages in sync |
 
 The README is a landing page, not a changelog: put "what's new" in `CHANGELOG.md` and upgrade
 steps in `docs/MIGRATION.md`. Code examples in the README must run as written.
+
+Link previews (`site/assets/og/*.png`) are cached by LinkedIn, Telegram and others per image URL.
+When you replace an image, bump the `?v=` query in every page's `og:image` tag, then refresh the
+preview (LinkedIn Post Inspector, @WebpageBot in Telegram).
 
 ---
 

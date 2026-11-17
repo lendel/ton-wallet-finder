@@ -5,10 +5,32 @@
 How to upgrade between major versions of `ton-wallet-finder`. Every change, including minor
 and patch releases, is listed in the [CHANGELOG](../CHANGELOG.md).
 
+- [6.x → 7.0](#6x--70)
 - [5.x → 6.0](#5x--60)
 - [4.x → 5.x](#4x--5x)
 - [3.x → 4.0](#3x--40)
 - [2.x → 3.x / 4.x](#2x--3x--4x)
+
+---
+
+## 6.x → 7.0
+
+**What's new:** addresses are searched and returned in the non-bounceable wallet form `UQ…`,
+the one wallet apps show, and the short CLI command is `tonvanity`.
+
+| What changed | 6.x | 7.0 |
+|---|---|---|
+| Address form searched and returned | bounceable `EQ…` | non-bounceable `UQ…` (`bounceable: false`) |
+| Short CLI command after `npm i -g` | `tonwf` | `tonvanity` (`npx tonvanity` works without installing) |
+
+The keys, mnemonics and wallets are derived exactly as before; only the written form of the
+address changes. **The ending is part of the checksum, so it changes with the form:** the same
+wallet ends differently as `EQ…` and as `UQ…`.
+
+- To keep the 6.x behaviour, pass `bounceable: true` (CLI: `--bounceable`).
+- Results saved by 6.x hold `EQ…` addresses. They are still valid; a wallet app shows the same
+  wallet in its `UQ…` form, with a different ending.
+- Replace `tonwf` with `tonvanity` in scripts.
 
 ---
 
