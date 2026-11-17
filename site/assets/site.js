@@ -75,7 +75,7 @@
       let lines = [];
       const draw = extra => { term.innerHTML = lines.join('\n') + (extra ?? '\n<span class="cursor"></span>'); };
       let cmd = '';
-      for (const ch of 'npx tonwf ' + target) {
+      for (const ch of 'npx tonvanity ' + target) {
         cmd += ch; lines = ['<span class="t-acc">$</span> ' + esc(cmd)]; draw(''); await sleep(55);
       }
       await sleep(300);

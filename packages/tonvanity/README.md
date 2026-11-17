@@ -1,13 +1,13 @@
-# tonwf
+# tonvanity
 
 Short name for the command-line tool of
 [**ton-wallet-finder**](https://www.npmjs.com/package/ton-wallet-finder) — a vanity address
 generator for the TON blockchain.
 
 ```sh
-npx tonwf abc                                   # W5 (v5r1) wallet ending with "abc"
-npx tonwf --decrypt ton_wallet_results.enc.json
-npx tonwf --help
+npx tonvanity abc                                   # W5 (v5r1) wallet ending with "abc"
+npx tonvanity --decrypt ton_wallet_results.enc.json
+npx tonvanity --help
 ```
 
 This package contains no logic of its own: it runs `ton-wallet-finder`'s CLI with your

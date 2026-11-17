@@ -64,7 +64,7 @@
   },
   "bin": {
     "ton-wallet-finder": "cli.js",
-    "tonwf": "cli.js"
+    "tonvanity": "cli.js"
   },
   "files": [
     "index.js",

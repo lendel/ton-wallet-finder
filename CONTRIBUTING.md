@@ -145,23 +145,23 @@ Releases are published by CI only (`.github/workflows/publish.yml`), never from 
    changelog entry with release readers in mind. To create a missing release for an
    already published tag, run **GitHub Release** manually from the *Actions* tab with the tag.
 
-### The `tonwf` package
+### The `tonvanity` package
 
-`packages/tonwf` is a separate npm package (`npx tonwf`) that only starts this package's CLI.
+`packages/tonvanity` is a separate npm package (`npx tonvanity`) that only starts this package's CLI.
 It is released on its own, rarely:
 
 - **When:** after a new *major* of `ton-wallet-finder` (bump its dependency range, e.g.
   `^7.0.0`; `test/cli.test.js` fails until you do), or when its README/wrapper changes.
-  Minor and patch releases of the main package reach `npx tonwf` users automatically.
-- **How:** bump `packages/tonwf/package.json`, merge, then
-  `git tag tonwf-vX.Y.Z && git push origin tonwf-vX.Y.Z` — `publish-tonwf.yml` publishes it.
+  Minor and patch releases of the main package reach `npx tonvanity` users automatically.
+- **How:** bump `packages/tonvanity/package.json`, merge, then
+  `git tag tonvanity-vX.Y.Z && git push origin tonvanity-vX.Y.Z` — `publish-tonvanity.yml` publishes it.
 - **First publish (done once):** npm only lets you register a trusted publisher for a
   package that exists, so version 1.0.0 is published with a temporary token:
   1. On npmjs.com create a *Granular Access Token* (read and write, all packages, shortest
      expiry, *Bypass 2FA*) and save it as the repository secret `NPM_TOKEN`.
-  2. Run **Publish tonwf to npm** manually from the *Actions* tab on `main`.
-  3. Register the trusted publisher for `tonwf` exactly as below, but with workflow
-     `publish-tonwf.yml`; then delete the `NPM_TOKEN` secret and revoke the token.
+  2. Run **Publish tonvanity to npm** manually from the *Actions* tab on `main`.
+  3. Register the trusted publisher for `tonvanity` exactly as below, but with workflow
+     `publish-tonvanity.yml`; then delete the `NPM_TOKEN` secret and revoke the token.
 
 ### Authentication: npm trusted publishing (OIDC)
 
